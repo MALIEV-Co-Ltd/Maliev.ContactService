@@ -51,4 +51,13 @@ CodeCoverage/
 # NUnit
 *.VisualState.xml
 TestResult.xml
+
+# Maliev Specific
+*.csproj.user
+maliev-shared-secrets.yaml
+*.xml
 nunit-*.xml
+.gemini/
+gha-creds-*.json
+migration_source/
+reference_project/
