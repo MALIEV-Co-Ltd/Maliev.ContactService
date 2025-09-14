@@ -34,8 +34,16 @@ public class ContactsController : ControllerBase
     [EnableRateLimiting("ContactPolicy")]
     public async Task<ActionResult<ContactMessageDto>> CreateContactMessage(CreateContactMessageRequest request)
     {
-        var contact = await _contactService.CreateContactMessageAsync(request);
-        return CreatedAtAction(nameof(GetContactMessage), new { id = contact.Id }, contact);
+        try
+        {
+            var contact = await _contactService.CreateContactMessageAsync(request);
+            return CreatedAtAction(nameof(GetContactMessage), new { id = contact.Id }, contact);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating contact message from {Email}", request?.Email ?? "unknown");
+            return StatusCode(500, new { message = "An error occurred while processing your request" });
+        }
     }
 
     /// <summary>
@@ -53,8 +61,17 @@ public class ContactsController : ControllerBase
         [FromQuery] ContactStatus? status = null,
         [FromQuery] ContactType? contactType = null)
     {
-        var contacts = await _contactService.GetContactMessagesAsync(pagination.Page, pagination.PageSize, status, contactType);
-        return Ok(contacts);
+        try
+        {
+            var contacts = await _contactService.GetContactMessagesAsync(pagination.Page, pagination.PageSize, status, contactType);
+            return Ok(contacts);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting contact messages with pagination Page={Page}, PageSize={PageSize}, Status={Status}, ContactType={ContactType}", 
+                pagination.Page, pagination.PageSize, status, contactType);
+            return StatusCode(500, new { message = "An error occurred while processing your request" });
+        }
     }
 
     /// <summary>
@@ -67,13 +84,21 @@ public class ContactsController : ControllerBase
     [EnableRateLimiting("GlobalPolicy")]
     public async Task<ActionResult<ContactMessageDto>> GetContactMessage(int id)
     {
-        var contact = await _contactService.GetContactMessageByIdAsync(id);
-        if (contact == null)
+        try
         {
-            return NotFound();
-        }
+            var contact = await _contactService.GetContactMessageByIdAsync(id);
+            if (contact == null)
+            {
+                return NotFound();
+            }
 
-        return Ok(contact);
+            return Ok(contact);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting contact message with id {Id}", id);
+            return StatusCode(500, new { message = "An error occurred while processing your request" });
+        }
     }
 
     /// <summary>
@@ -129,8 +154,20 @@ public class ContactsController : ControllerBase
     [EnableRateLimiting("GlobalPolicy")]
     public async Task<ActionResult<IEnumerable<ContactFileDto>>> GetContactFiles(int id)
     {
-        var files = await _contactService.GetContactFilesAsync(id);
-        return Ok(files);
+        try
+        {
+            var files = await _contactService.GetContactFilesAsync(id);
+            return Ok(files);
+        }
+        catch (Maliev.ContactService.Api.Exceptions.NotFoundException)
+        {
+            return NotFound();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting contact files for contact message with id {Id}", id);
+            return StatusCode(500, new { message = "An error occurred while processing your request" });
+        }
     }
 
     /// <summary>
@@ -166,15 +203,27 @@ public class ContactsController : ControllerBase
     [EnableRateLimiting("GlobalPolicy")]
     public async Task<IActionResult> DownloadContactFile(int id, int fileId)
     {
-        var files = await _contactService.GetContactFilesAsync(id);
-        var file = files.FirstOrDefault(f => f.Id == fileId);
+        try
+        {
+            var files = await _contactService.GetContactFilesAsync(id);
+            var file = files.FirstOrDefault(f => f.Id == fileId);
 
-        if (file == null || string.IsNullOrEmpty(file.UploadServiceFileId))
+            if (file == null || string.IsNullOrEmpty(file.UploadServiceFileId))
+            {
+                return NotFound();
+            }
+
+            var downloadResponse = await _uploadService.DownloadFileAsync(file.UploadServiceFileId);
+            return File(downloadResponse.Content, downloadResponse.ContentType, downloadResponse.FileName);
+        }
+        catch (Maliev.ContactService.Api.Exceptions.NotFoundException)
         {
             return NotFound();
         }
-
-        var downloadResponse = await _uploadService.DownloadFileAsync(file.UploadServiceFileId);
-        return File(downloadResponse.Content, downloadResponse.ContentType, downloadResponse.FileName);
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error downloading contact file with id {FileId} for contact message with id {Id}", fileId, id);
+            return StatusCode(500, new { message = "An error occurred while processing your request" });
+        }
     }
 }
