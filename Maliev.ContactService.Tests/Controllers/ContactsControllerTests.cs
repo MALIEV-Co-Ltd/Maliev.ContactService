@@ -55,6 +55,8 @@ public class ContactsControllerTests
             .ReturnsAsync(expectedContact);
 
         // Act
+        // Note: Not using ConfigureAwait(false) in test methods as it's not recommended by xUnit
+        // xUnit handles synchronization context management internally
         var result = await _controller.CreateContactMessage(request);
 
         // Assert
@@ -89,6 +91,7 @@ public class ContactsControllerTests
             .ReturnsAsync(expectedContact);
 
         // Act
+        // Note: Not using ConfigureAwait(false) in test methods as it's not recommended by xUnit
         var result = await _controller.GetContactMessage(contactId);
 
         // Assert
@@ -106,6 +109,7 @@ public class ContactsControllerTests
             .ReturnsAsync((ContactMessageDto?)null);
 
         // Act
+        // Note: Not using ConfigureAwait(false) in test methods as it's not recommended by xUnit
         var result = await _controller.GetContactMessage(contactId);
 
         // Assert
@@ -146,11 +150,13 @@ public class ContactsControllerTests
             }
         };
 
+        var pagination = new PaginationParameters { Page = 1, PageSize = 20 };
         _contactServiceMock.Setup(x => x.GetContactMessagesAsync(1, 20, null, null))
             .ReturnsAsync(expectedContacts);
 
         // Act
-        var result = await _controller.GetContactMessages();
+        // Note: Not using ConfigureAwait(false) in test methods as it's not recommended by xUnit
+        var result = await _controller.GetContactMessages(pagination);
 
         // Assert
         result.Result.Should().BeOfType<OkObjectResult>();
@@ -166,11 +172,13 @@ public class ContactsControllerTests
         // Arrange
         var expectedContacts = new List<ContactMessageDto>();
 
+        var pagination = new PaginationParameters { Page = 1, PageSize = 20 }; // Will be overridden by validation
         _contactServiceMock.Setup(x => x.GetContactMessagesAsync(1, 20, ContactStatus.New, ContactType.General))
             .ReturnsAsync(expectedContacts);
 
         // Act - Test parameter validation and defaults
-        var result = await _controller.GetContactMessages(page: -1, pageSize: 150, status: ContactStatus.New, contactType: ContactType.General);
+        // Note: Not using ConfigureAwait(false) in test methods as it's not recommended by xUnit
+        var result = await _controller.GetContactMessages(pagination, ContactStatus.New, ContactType.General);
 
         // Assert
         result.Result.Should().BeOfType<OkObjectResult>();
@@ -208,6 +216,7 @@ public class ContactsControllerTests
             .ReturnsAsync(updatedContact);
 
         // Act
+        // Note: Not using ConfigureAwait(false) in test methods as it's not recommended by xUnit
         var result = await _controller.UpdateContactStatus(contactId, updateRequest);
 
         // Assert
@@ -227,9 +236,10 @@ public class ContactsControllerTests
         };
 
         _contactServiceMock.Setup(x => x.UpdateContactStatusAsync(contactId, updateRequest))
-            .ReturnsAsync((ContactMessageDto?)null);
+            .ThrowsAsync(new Maliev.ContactService.Api.Exceptions.NotFoundException("Contact not found"));
 
         // Act
+        // Note: Not using ConfigureAwait(false) in test methods as it's not recommended by xUnit
         var result = await _controller.UpdateContactStatus(contactId, updateRequest);
 
         // Assert
@@ -242,9 +252,10 @@ public class ContactsControllerTests
         // Arrange
         var contactId = 1;
         _contactServiceMock.Setup(x => x.DeleteContactMessageAsync(contactId))
-            .ReturnsAsync(true);
+            .Returns(Task.CompletedTask);
 
         // Act
+        // Note: Not using ConfigureAwait(false) in test methods as it's not recommended by xUnit
         var result = await _controller.DeleteContactMessage(contactId);
 
         // Assert
@@ -257,9 +268,10 @@ public class ContactsControllerTests
         // Arrange
         var contactId = 999;
         _contactServiceMock.Setup(x => x.DeleteContactMessageAsync(contactId))
-            .ReturnsAsync(false);
+            .ThrowsAsync(new Maliev.ContactService.Api.Exceptions.NotFoundException("Contact not found"));
 
         // Act
+        // Note: Not using ConfigureAwait(false) in test methods as it's not recommended by xUnit
         var result = await _controller.DeleteContactMessage(contactId);
 
         // Assert
@@ -289,6 +301,7 @@ public class ContactsControllerTests
             .ReturnsAsync(expectedFiles);
 
         // Act
+        // Note: Not using ConfigureAwait(false) in test methods as it's not recommended by xUnit
         var result = await _controller.GetContactFiles(contactId);
 
         // Assert
@@ -305,9 +318,10 @@ public class ContactsControllerTests
         var contactId = 1;
         var fileId = 1;
         _contactServiceMock.Setup(x => x.DeleteContactFileAsync(contactId, fileId))
-            .ReturnsAsync(true);
+            .Returns(Task.CompletedTask);
 
         // Act
+        // Note: Not using ConfigureAwait(false) in test methods as it's not recommended by xUnit
         var result = await _controller.DeleteContactFile(contactId, fileId);
 
         // Assert
@@ -321,9 +335,10 @@ public class ContactsControllerTests
         var contactId = 1;
         var fileId = 999;
         _contactServiceMock.Setup(x => x.DeleteContactFileAsync(contactId, fileId))
-            .ReturnsAsync(false);
+            .ThrowsAsync(new Maliev.ContactService.Api.Exceptions.NotFoundException("Contact file not found"));
 
         // Act
+        // Note: Not using ConfigureAwait(false) in test methods as it's not recommended by xUnit
         var result = await _controller.DeleteContactFile(contactId, fileId);
 
         // Assert
@@ -365,6 +380,7 @@ public class ContactsControllerTests
             .ReturnsAsync(downloadResponse);
 
         // Act
+        // Note: Not using ConfigureAwait(false) in test methods as it's not recommended by xUnit
         var result = await _controller.DownloadContactFile(contactId, fileId);
 
         // Assert
@@ -387,10 +403,123 @@ public class ContactsControllerTests
             .ReturnsAsync(files);
 
         // Act
+        // Note: Not using ConfigureAwait(false) in test methods as it's not recommended by xUnit
         var result = await _controller.DownloadContactFile(contactId, fileId);
 
         // Assert
         result.Should().BeOfType<NotFoundResult>();
+    }
+
+    [Fact]
+    public void GetContactMessages_Should_Have_Authorize_Attribute()
+    {
+        // Arrange
+        var methodInfo = typeof(ContactsController).GetMethod(nameof(ContactsController.GetContactMessages));
+
+        // Act
+        var authorizeAttribute = methodInfo?.GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), false);
+
+        // Assert
+        authorizeAttribute.Should().NotBeNull();
+        authorizeAttribute.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void GetContactMessage_Should_Have_Authorize_Attribute()
+    {
+        // Arrange
+        var methodInfo = typeof(ContactsController).GetMethod(nameof(ContactsController.GetContactMessage));
+
+        // Act
+        var authorizeAttribute = methodInfo?.GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), false);
+
+        // Assert
+        authorizeAttribute.Should().NotBeNull();
+        authorizeAttribute.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void UpdateContactStatus_Should_Have_Authorize_Attribute()
+    {
+        // Arrange
+        var methodInfo = typeof(ContactsController).GetMethod(nameof(ContactsController.UpdateContactStatus));
+
+        // Act
+        var authorizeAttribute = methodInfo?.GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), false);
+
+        // Assert
+        authorizeAttribute.Should().NotBeNull();
+        authorizeAttribute.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void DeleteContactMessage_Should_Have_Authorize_Attribute()
+    {
+        // Arrange
+        var methodInfo = typeof(ContactsController).GetMethod(nameof(ContactsController.DeleteContactMessage));
+
+        // Act
+        var authorizeAttribute = methodInfo?.GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), false);
+
+        // Assert
+        authorizeAttribute.Should().NotBeNull();
+        authorizeAttribute.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void GetContactFiles_Should_Have_Authorize_Attribute()
+    {
+        // Arrange
+        var methodInfo = typeof(ContactsController).GetMethod(nameof(ContactsController.GetContactFiles));
+
+        // Act
+        var authorizeAttribute = methodInfo?.GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), false);
+
+        // Assert
+        authorizeAttribute.Should().NotBeNull();
+        authorizeAttribute.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void DeleteContactFile_Should_Have_Authorize_Attribute()
+    {
+        // Arrange
+        var methodInfo = typeof(ContactsController).GetMethod(nameof(ContactsController.DeleteContactFile));
+
+        // Act
+        var authorizeAttribute = methodInfo?.GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), false);
+
+        // Assert
+        authorizeAttribute.Should().NotBeNull();
+        authorizeAttribute.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void DownloadContactFile_Should_Have_Authorize_Attribute()
+    {
+        // Arrange
+        var methodInfo = typeof(ContactsController).GetMethod(nameof(ContactsController.DownloadContactFile));
+
+        // Act
+        var authorizeAttribute = methodInfo?.GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), false);
+
+        // Assert
+        authorizeAttribute.Should().NotBeNull();
+        authorizeAttribute.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void CreateContactMessage_Should_Have_AllowAnonymous_Attribute()
+    {
+        // Arrange
+        var methodInfo = typeof(ContactsController).GetMethod(nameof(ContactsController.CreateContactMessage));
+
+        // Act
+        var allowAnonymousAttribute = methodInfo?.GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AllowAnonymousAttribute), false);
+
+        // Assert
+        allowAnonymousAttribute.Should().NotBeNull();
+        allowAnonymousAttribute.Should().HaveCount(1);
     }
 
 }

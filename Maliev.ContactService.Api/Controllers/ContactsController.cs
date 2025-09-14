@@ -41,8 +41,7 @@ public class ContactsController : ControllerBase
     /// <summary>
     /// Get all contact messages (admin only)
     /// </summary>
-    /// <param name="page">Page number</param>
-    /// <param name="pageSize">Items per page</param>
+    /// <param name="pagination">Pagination parameters</param>
     /// <param name="status">Filter by status</param>
     /// <param name="contactType">Filter by contact type</param>
     /// <returns>List of contact messages</returns>
@@ -50,15 +49,11 @@ public class ContactsController : ControllerBase
     [Authorize(Policy = "AdminOnly")]
     [EnableRateLimiting("GlobalPolicy")]
     public async Task<ActionResult<IEnumerable<ContactMessageDto>>> GetContactMessages(
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20,
+        [FromQuery] PaginationParameters pagination,
         [FromQuery] ContactStatus? status = null,
         [FromQuery] ContactType? contactType = null)
     {
-        if (page < 1) page = 1;
-        if (pageSize < 1 || pageSize > 100) pageSize = 20;
-
-        var contacts = await _contactService.GetContactMessagesAsync(page, pageSize, status, contactType);
+        var contacts = await _contactService.GetContactMessagesAsync(pagination.Page, pagination.PageSize, status, contactType);
         return Ok(contacts);
     }
 
