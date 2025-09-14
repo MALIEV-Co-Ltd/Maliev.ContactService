@@ -47,7 +47,7 @@ public class ContactsController : ControllerBase
     /// <param name="contactType">Filter by contact type</param>
     /// <returns>List of contact messages</returns>
     [HttpGet]
-    [Authorize]
+    [Authorize(Policy = "AdminOnly")]
     [EnableRateLimiting("GlobalPolicy")]
     public async Task<ActionResult<IEnumerable<ContactMessageDto>>> GetContactMessages(
         [FromQuery] int page = 1,
@@ -68,7 +68,7 @@ public class ContactsController : ControllerBase
     /// <param name="id">Contact message ID</param>
     /// <returns>The contact message</returns>
     [HttpGet("{id}")]
-    [Authorize]
+    [Authorize(Policy = "AdminOnly")]
     [EnableRateLimiting("GlobalPolicy")]
     public async Task<ActionResult<ContactMessageDto>> GetContactMessage(int id)
     {
@@ -88,17 +88,19 @@ public class ContactsController : ControllerBase
     /// <param name="request">Status update request</param>
     /// <returns>Updated contact message</returns>
     [HttpPut("{id}/status")]
-    [Authorize]
+    [Authorize(Policy = "AdminOnly")]
     [EnableRateLimiting("GlobalPolicy")]
     public async Task<ActionResult<ContactMessageDto>> UpdateContactStatus(int id, UpdateContactStatusRequest request)
     {
-        var contact = await _contactService.UpdateContactStatusAsync(id, request);
-        if (contact == null)
+        try
+        {
+            var contact = await _contactService.UpdateContactStatusAsync(id, request);
+            return Ok(contact);
+        }
+        catch (Maliev.ContactService.Api.Exceptions.NotFoundException)
         {
             return NotFound();
         }
-
-        return Ok(contact);
     }
 
     /// <summary>
@@ -107,17 +109,19 @@ public class ContactsController : ControllerBase
     /// <param name="id">Contact message ID</param>
     /// <returns>No content if successful</returns>
     [HttpDelete("{id}")]
-    [Authorize]
+    [Authorize(Policy = "AdminOnly")]
     [EnableRateLimiting("GlobalPolicy")]
     public async Task<IActionResult> DeleteContactMessage(int id)
     {
-        var deleted = await _contactService.DeleteContactMessageAsync(id);
-        if (!deleted)
+        try
+        {
+            await _contactService.DeleteContactMessageAsync(id);
+            return NoContent();
+        }
+        catch (Maliev.ContactService.Api.Exceptions.NotFoundException)
         {
             return NotFound();
         }
-
-        return NoContent();
     }
 
     /// <summary>
@@ -126,7 +130,7 @@ public class ContactsController : ControllerBase
     /// <param name="id">Contact message ID</param>
     /// <returns>List of files</returns>
     [HttpGet("{id}/files")]
-    [Authorize]
+    [Authorize(Policy = "AdminOnly")]
     [EnableRateLimiting("GlobalPolicy")]
     public async Task<ActionResult<IEnumerable<ContactFileDto>>> GetContactFiles(int id)
     {
@@ -141,17 +145,19 @@ public class ContactsController : ControllerBase
     /// <param name="fileId">File ID</param>
     /// <returns>No content if successful</returns>
     [HttpDelete("{id}/files/{fileId}")]
-    [Authorize]
+    [Authorize(Policy = "AdminOnly")]
     [EnableRateLimiting("GlobalPolicy")]
     public async Task<IActionResult> DeleteContactFile(int id, int fileId)
     {
-        var deleted = await _contactService.DeleteContactFileAsync(id, fileId);
-        if (!deleted)
+        try
+        {
+            await _contactService.DeleteContactFileAsync(id, fileId);
+            return NoContent();
+        }
+        catch (Maliev.ContactService.Api.Exceptions.NotFoundException)
         {
             return NotFound();
         }
-
-        return NoContent();
     }
 
     /// <summary>
@@ -161,7 +167,7 @@ public class ContactsController : ControllerBase
     /// <param name="fileId">File ID</param>
     /// <returns>The file content</returns>
     [HttpGet("{id}/files/{fileId}/download")]
-    [Authorize]
+    [Authorize(Policy = "AdminOnly")]
     [EnableRateLimiting("GlobalPolicy")]
     public async Task<IActionResult> DownloadContactFile(int id, int fileId)
     {
