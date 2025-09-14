@@ -139,20 +139,63 @@ try
     builder.Services.AddTransient<IConfigureOptions<SwaggerGenOptions>, ConfigureSwaggerOptions>();
     builder.Services.AddSwaggerGen();
 
-    // Configure CORS
+    // Configure CORS - Secure HTTPS-only policy
     builder.Services.AddCors(options =>
     {
         options.AddDefaultPolicy(
             policy =>
             {
-                policy.WithOrigins(
-                    "https://maliev.com",
-                    "https://*.maliev.com",
-                    "http://maliev.com",
-                    "http://*.maliev.com")
-                .AllowAnyHeader()
-                .AllowAnyMethod();
+                // Production: HTTPS-only origins
+                if (builder.Environment.IsProduction())
+                {
+                    policy.WithOrigins(
+                        "https://maliev.com",
+                        "https://www.maliev.com")
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .AllowCredentials(); // Enable credentials for authenticated requests
+                }
+                // Staging: HTTPS-only for staging domain
+                else if (builder.Environment.IsStaging())
+                {
+                    policy.WithOrigins(
+                        "https://staging.maliev.com",
+                        "https://maliev-staging.web.app")
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .AllowCredentials();
+                }
+                // Development: Allow localhost with both HTTP and HTTPS
+                else if (builder.Environment.IsDevelopment())
+                {
+                    policy.WithOrigins(
+                        "https://localhost:3000",
+                        "https://localhost:3001",
+                        "http://localhost:3000",
+                        "http://localhost:3001",
+                        "https://maliev.com",
+                        "https://www.maliev.com")
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .AllowCredentials();
+                }
+                // Default: Strict HTTPS-only
+                else
+                {
+                    policy.WithOrigins("https://maliev.com")
+                    .AllowAnyHeader()
+                    .AllowAnyMethod();
+                }
             });
+
+        // Add a named policy for API-only access (more restrictive)
+        options.AddPolicy("ApiOnly", policy =>
+        {
+            policy.WithOrigins("https://maliev.com", "https://www.maliev.com")
+                .WithHeaders("Content-Type", "Authorization", "X-API-Key")
+                .WithMethods("GET", "POST", "PUT", "DELETE")
+                .AllowCredentials();
+        });
     });
 
     // Configure JWT Authentication (skip in Testing environment)
@@ -161,17 +204,46 @@ try
         var jwtSection = builder.Configuration.GetSection(JwtOptions.SectionName);
         if (jwtSection.Exists())
         {
+            // Bind and validate JWT configuration
+            var jwtOptions = new JwtOptions();
+            jwtSection.Bind(jwtOptions);
+
+            // Validate JWT configuration
+            if (string.IsNullOrEmpty(jwtOptions.Issuer) ||
+                string.IsNullOrEmpty(jwtOptions.Audience) ||
+                string.IsNullOrEmpty(jwtOptions.SecurityKey))
+            {
+                var missingValues = new List<string>();
+                if (string.IsNullOrEmpty(jwtOptions.Issuer)) missingValues.Add("Issuer");
+                if (string.IsNullOrEmpty(jwtOptions.Audience)) missingValues.Add("Audience");
+                if (string.IsNullOrEmpty(jwtOptions.SecurityKey)) missingValues.Add("SecurityKey");
+
+                Log.Error("JWT configuration validation failed. Missing required values: {MissingValues}", string.Join(", ", missingValues));
+
+                // In production, fail fast for security
+                if (builder.Environment.IsProduction())
+                {
+                    throw new InvalidOperationException($"JWT configuration is incomplete. Missing: {string.Join(", ", missingValues)}");
+                }
+                Log.Warning("JWT configuration incomplete - authentication will not work properly");
+                return;
+            }
+
+            // Validate security key strength
+            if (jwtOptions.SecurityKey.Length < 32)
+            {
+                Log.Error("JWT SecurityKey must be at least 32 characters for security");
+                if (builder.Environment.IsProduction())
+                {
+                    throw new InvalidOperationException("JWT SecurityKey is too weak. Must be at least 32 characters.");
+                }
+                Log.Warning("JWT SecurityKey is too weak - should be at least 32 characters");
+            }
+
+            builder.Services.Configure<JwtOptions>(jwtSection);
             builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 .AddJwtBearer(options =>
                 {
-                    var jwtOptions = new JwtOptions
-                    {
-                        Issuer = "default-issuer",
-                        Audience = "default-audience",
-                        SecurityKey = "default-key"
-                    };
-                    jwtSection.Bind(jwtOptions);
-
                     options.TokenValidationParameters = new TokenValidationParameters
                     {
                         ValidateIssuer = true,
@@ -180,14 +252,46 @@ try
                         ValidateIssuerSigningKey = true,
                         ValidIssuer = jwtOptions.Issuer,
                         ValidAudience = jwtOptions.Audience,
-                        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SecurityKey))
+                        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SecurityKey)),
+                        ClockSkew = TimeSpan.FromMinutes(5), // Allow 5 minutes clock skew
+                        RequireExpirationTime = true,
+                        RequireSignedTokens = true
+                    };
+
+                    // Enhanced security options
+                    options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+                    options.SaveToken = false; // Don't store tokens in AuthenticationProperties
+                    options.IncludeErrorDetails = builder.Environment.IsDevelopment();
+
+                    // Event handlers for better security logging
+                    options.Events = new JwtBearerEvents
+                    {
+                        OnAuthenticationFailed = context =>
+                        {
+                            Log.Warning("JWT Authentication failed: {Error}", context.Exception.Message);
+                            return Task.CompletedTask;
+                        },
+                        OnTokenValidated = context =>
+                        {
+                            Log.Debug("JWT Token validated for {User}", context.Principal?.Identity?.Name ?? "Unknown");
+                            return Task.CompletedTask;
+                        }
                     };
                 });
+
+            Log.Information("JWT Authentication configured with issuer: {Issuer}, audience: {Audience}",
+                jwtOptions.Issuer, jwtOptions.Audience);
         }
         else
         {
-            // Log warning that JWT is not configured for local development
-            Log.Warning("JWT configuration not found - API will start but authentication will not work. Configure JWT secrets for full functionality.");
+            Log.Warning("JWT configuration section '{SectionName}' not found - authentication will be disabled", JwtOptions.SectionName);
+
+            // In production environments, JWT should be mandatory
+            if (builder.Environment.IsProduction() || builder.Environment.IsStaging())
+            {
+                Log.Error("JWT configuration is mandatory in {Environment} environment", builder.Environment.EnvironmentName);
+                throw new InvalidOperationException($"JWT configuration is required in {builder.Environment.EnvironmentName} environment");
+            }
         }
     }
 
@@ -209,19 +313,29 @@ try
     app.UseForwardedHeaders();
 
     // Configure the HTTP request pipeline
-    app.UseSwagger(c =>
+    // Only enable Swagger in non-production environments for security
+    if (!app.Environment.IsProduction())
     {
-        c.RouteTemplate = "contacts/swagger/{documentName}/swagger.json";
-    });
-    app.UseSwaggerUI(c =>
-    {
-        var provider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
-        foreach (var description in provider.ApiVersionDescriptions)
+        app.UseSwagger(c =>
         {
-            c.SwaggerEndpoint($"/contacts/swagger/{description.GroupName}/swagger.json", description.GroupName.ToUpperInvariant());
-        }
-        c.RoutePrefix = "contacts/swagger";
-    });
+            c.RouteTemplate = "contacts/swagger/{documentName}/swagger.json";
+        });
+        app.UseSwaggerUI(c =>
+        {
+            var provider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
+            foreach (var description in provider.ApiVersionDescriptions)
+            {
+                c.SwaggerEndpoint($"/contacts/swagger/{description.GroupName}/swagger.json", description.GroupName.ToUpperInvariant());
+            }
+            c.RoutePrefix = "contacts/swagger";
+        });
+
+        Log.Information("Swagger UI enabled for {Environment} environment at /contacts/swagger", app.Environment.EnvironmentName);
+    }
+    else
+    {
+        Log.Information("Swagger UI disabled in production environment for security");
+    }
 
     app.UseMiddleware<ExceptionHandlingMiddleware>();
     app.UseHttpsRedirection();
@@ -256,25 +370,44 @@ try
     // MANDATORY: Prometheus metrics endpoint
     app.MapMetrics("/contacts/metrics");
 
-    // Ensure database is created and seeded
+    // Safe database initialization - only for non-production environments
     using (var scope = app.Services.CreateScope())
     {
         var context = scope.ServiceProvider.GetRequiredService<ContactDbContext>();
         try
         {
-            if (context.Database.IsRelational())
+            // Only run migrations in Development or Testing environments
+            if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
             {
-                context.Database.Migrate();
+                if (context.Database.IsRelational())
+                {
+                    context.Database.Migrate();
+                    Log.Information("Database migration completed for {Environment}", app.Environment.EnvironmentName);
+                }
+                else
+                {
+                    context.Database.EnsureCreated();
+                    Log.Information("In-memory database created for {Environment}", app.Environment.EnvironmentName);
+                }
             }
             else
             {
-                context.Database.EnsureCreated();
+                // Production: Only verify database connectivity
+                if (context.Database.IsRelational())
+                {
+                    await context.Database.CanConnectAsync();
+                    Log.Information("Database connectivity verified for production");
+                }
             }
-            Log.Information("Database initialization completed");
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "An error occurred while initializing the database");
+            Log.Error(ex, "Database initialization failed for environment {Environment}", app.Environment.EnvironmentName);
+            // In production, fail fast if database is not accessible
+            if (app.Environment.IsProduction())
+            {
+                throw;
+            }
         }
     }
 
@@ -294,9 +427,9 @@ public class JwtOptions
 {
     public const string SectionName = "Jwt";
 
-    public required string Issuer { get; set; }
-    public required string Audience { get; set; }
-    public required string SecurityKey { get; set; }
+    public string Issuer { get; set; } = string.Empty;
+    public string Audience { get; set; } = string.Empty;
+    public string SecurityKey { get; set; } = string.Empty;
 }
 
 // Make Program class accessible for integration tests

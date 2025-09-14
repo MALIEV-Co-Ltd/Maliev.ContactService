@@ -65,30 +65,6 @@ public class ContactsControllerTests
         createdResult.Value.Should().Be(expectedContact);
     }
 
-    [Fact]
-    public async Task CreateContactMessage_Should_Handle_Exception()
-    {
-        // Arrange
-        var request = new CreateContactMessageRequest
-        {
-            FullName = "Test User",
-            Email = "test@example.com",
-            Subject = "Test Subject",
-            Message = "Test Message",
-            ContactType = ContactType.General
-        };
-
-        _contactServiceMock.Setup(x => x.CreateContactMessageAsync(request))
-            .ThrowsAsync(new InvalidOperationException("Database error"));
-
-        // Act
-        var result = await _controller.CreateContactMessage(request);
-
-        // Assert
-        result.Result.Should().BeOfType<ObjectResult>();
-        var objectResult = result.Result as ObjectResult;
-        objectResult!.StatusCode.Should().Be(500);
-    }
 
     [Fact]
     public async Task GetContactMessage_Should_Return_Contact_When_Exists()
@@ -417,38 +393,4 @@ public class ContactsControllerTests
         result.Should().BeOfType<NotFoundResult>();
     }
 
-    [Fact]
-    public async Task DownloadContactFile_Should_Handle_Upload_Service_Exception()
-    {
-        // Arrange
-        var contactId = 1;
-        var fileId = 1;
-        var files = new List<ContactFileDto>
-        {
-            new ContactFileDto
-            {
-                Id = fileId,
-                FileName = "document.pdf",
-                ObjectName = "contacts/1/document.pdf",
-                FileSize = 1024,
-                ContentType = "application/pdf",
-                UploadServiceFileId = "upload-123",
-                CreatedAt = DateTime.UtcNow
-            }
-        };
-
-        _contactServiceMock.Setup(x => x.GetContactFilesAsync(contactId))
-            .ReturnsAsync(files);
-
-        _uploadServiceMock.Setup(x => x.DownloadFileAsync("upload-123"))
-            .ThrowsAsync(new HttpRequestException("Upload service unavailable"));
-
-        // Act
-        var result = await _controller.DownloadContactFile(contactId, fileId);
-
-        // Assert
-        result.Should().BeOfType<ObjectResult>();
-        var objectResult = result as ObjectResult;
-        objectResult!.StatusCode.Should().Be(500);
-    }
 }

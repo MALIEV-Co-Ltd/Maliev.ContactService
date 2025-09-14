@@ -34,16 +34,8 @@ public class ContactsController : ControllerBase
     [EnableRateLimiting("ContactPolicy")]
     public async Task<ActionResult<ContactMessageDto>> CreateContactMessage(CreateContactMessageRequest request)
     {
-        try
-        {
-            var contact = await _contactService.CreateContactMessageAsync(request);
-            return CreatedAtAction(nameof(GetContactMessage), new { id = contact.Id }, contact);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating contact message from {Email}", request.Email);
-            return StatusCode(500, new { message = "An error occurred while processing your request" });
-        }
+        var contact = await _contactService.CreateContactMessageAsync(request);
+        return CreatedAtAction(nameof(GetContactMessage), new { id = contact.Id }, contact);
     }
 
     /// <summary>
@@ -181,15 +173,7 @@ public class ContactsController : ControllerBase
             return NotFound();
         }
 
-        try
-        {
-            var downloadResponse = await _uploadService.DownloadFileAsync(file.UploadServiceFileId);
-            return File(downloadResponse.Content, downloadResponse.ContentType, downloadResponse.FileName);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to download file {FileId} for contact {ContactId}", fileId, id);
-            return StatusCode(500, new { message = "Failed to download file" });
-        }
+        var downloadResponse = await _uploadService.DownloadFileAsync(file.UploadServiceFileId);
+        return File(downloadResponse.Content, downloadResponse.ContentType, downloadResponse.FileName);
     }
 }
