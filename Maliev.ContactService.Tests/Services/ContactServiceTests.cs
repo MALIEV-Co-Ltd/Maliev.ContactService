@@ -262,6 +262,7 @@ public class ContactServiceTests : IDisposable
     public async Task GetContactMessagesAsync_Should_Return_Paginated_Results()
     {
         // Arrange
+        var baseTime = new DateTime(2025, 1, 1, 12, 0, 0, DateTimeKind.Utc);
         var contacts = new List<ContactMessage>();
         for (int i = 1; i <= 25; i++)
         {
@@ -274,8 +275,8 @@ public class ContactServiceTests : IDisposable
                 ContactType = i % 2 == 0 ? ContactType.General : ContactType.Business,
                 Priority = Priority.Medium,
                 Status = ContactStatus.New,
-                CreatedAt = DateTime.UtcNow.AddMinutes(-i),
-                UpdatedAt = DateTime.UtcNow.AddMinutes(-i)
+                CreatedAt = baseTime.AddMinutes(-i), // More recent timestamps for lower numbers
+                UpdatedAt = baseTime.AddMinutes(-i)   // More recent timestamps for lower numbers
             });
         }
 
@@ -286,8 +287,11 @@ public class ContactServiceTests : IDisposable
         var result = await _contactService.GetContactMessagesAsync(page: 1, pageSize: 10);
 
         // Assert
-        result.Should().HaveCount(10);
-        result.First().FullName.Should().Be("User 1"); // Most recent first
+        var resultList = result.ToList();
+        resultList.Should().HaveCount(10);
+        // The ordering should be by CreatedAt descending (most recent first)
+        // User 1 has the most recent CreatedAt timestamp (baseTime.AddMinutes(-1)), so it should be first
+        resultList.First().FullName.Should().Be("User 1");
     }
 
     [Fact]

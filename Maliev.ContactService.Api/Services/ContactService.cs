@@ -184,6 +184,7 @@ public class ContactService : IContactService
 
         var contacts = await query
             .OrderByDescending(c => c.CreatedAt)
+            .ThenByDescending(c => c.Id) // Secondary sort by ID for deterministic results when CreatedAt is the same
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();

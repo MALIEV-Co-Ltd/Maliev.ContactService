@@ -31,14 +31,23 @@ public class ContactDbContext : DbContext
 
         foreach (var entity in entities)
         {
+            var auditableEntity = (IAuditable)entity.Entity;
             var now = DateTime.UtcNow;
 
             if (entity.State == EntityState.Added)
             {
-                ((IAuditable)entity.Entity).CreatedAt = now;
+                // Only set CreatedAt if it hasn't been explicitly set (is default DateTime)
+                if (auditableEntity.CreatedAt == DateTime.MinValue)
+                {
+                    auditableEntity.CreatedAt = now;
+                }
             }
 
-            ((IAuditable)entity.Entity).UpdatedAt = now;
+            // Only set UpdatedAt if it hasn't been explicitly set (is default DateTime)
+            if (auditableEntity.UpdatedAt == DateTime.MinValue)
+            {
+                auditableEntity.UpdatedAt = now;
+            }
         }
     }
 
