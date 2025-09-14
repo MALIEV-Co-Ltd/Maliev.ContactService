@@ -1,3 +1,4 @@
+using Maliev.ContactService.Api.Exceptions;
 using System.Net;
 using System.Text.Json;
 
@@ -43,8 +44,19 @@ public class ExceptionHandlingMiddleware
             ArgumentException => (int)HttpStatusCode.BadRequest,
             UnauthorizedAccessException => (int)HttpStatusCode.Unauthorized,
             KeyNotFoundException => (int)HttpStatusCode.NotFound,
+            NotFoundException => (int)HttpStatusCode.NotFound,
             _ => (int)HttpStatusCode.InternalServerError
         };
+
+        // For NotFoundException, provide a more specific message
+        if (exception is NotFoundException)
+        {
+            errorResponse = new
+            {
+                message = exception.Message,
+                traceId = context.TraceIdentifier
+            };
+        }
 
         var jsonResponse = JsonSerializer.Serialize(errorResponse);
         await response.WriteAsync(jsonResponse);
