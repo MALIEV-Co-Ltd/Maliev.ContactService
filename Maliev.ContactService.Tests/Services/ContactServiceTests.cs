@@ -390,7 +390,7 @@ public class ContactServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateContactMessageAsync_Should_Throw_Exception_When_Request_Is_Null()
+    public async Task CreateContactMessageAsync_Should_Throw_ArgumentNullException_When_Request_Is_Null()
     {
         // Act
         Func<Task> act = async () => await _contactService.CreateContactMessageAsync(null!);
@@ -442,6 +442,170 @@ public class ContactServiceTests : IDisposable
                 It.IsAny<Exception>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateContactStatusAsync_Should_Throw_NotFoundException_When_Contact_Not_Exists()
+    {
+        // Arrange
+        var contactId = 999; // Non-existent contact ID
+        var updateRequest = new UpdateContactStatusRequest
+        {
+            Status = ContactStatus.InProgress
+        };
+
+        _context.ContactMessages.Where(c => c.Id == contactId).ToList().Should().BeEmpty();
+
+        // Act
+        Func<Task> act = async () => await _contactService.UpdateContactStatusAsync(contactId, updateRequest);
+
+        // Assert
+        await act.Should().ThrowAsync<Maliev.ContactService.Api.Exceptions.NotFoundException>();
+    }
+
+    [Fact]
+    public async Task DeleteContactMessageAsync_Should_Throw_NotFoundException_When_Contact_Not_Exists()
+    {
+        // Arrange
+        var contactId = 999; // Non-existent contact ID
+
+        _context.ContactMessages.Where(c => c.Id == contactId).ToList().Should().BeEmpty();
+
+        // Act
+        Func<Task> act = async () => await _contactService.DeleteContactMessageAsync(contactId);
+
+        // Assert
+        await act.Should().ThrowAsync<Maliev.ContactService.Api.Exceptions.NotFoundException>();
+    }
+
+    [Fact]
+    public async Task DeleteContactFileAsync_Should_Throw_NotFoundException_When_File_Not_Exists()
+    {
+        // Arrange
+        var contactId = 1;
+        var fileId = 999; // Non-existent file ID
+
+        // Create a contact message first
+        var contact = new ContactMessage
+        {
+            FullName = "Test User",
+            Email = "test@example.com",
+            Subject = "Test Subject",
+            Message = "Test Message",
+            ContactType = ContactType.General,
+            Priority = Priority.Medium,
+            Status = ContactStatus.New,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        _context.ContactMessages.Add(contact);
+        await _context.SaveChangesAsync();
+
+        // Verify the contact exists
+        var existingContact = await _context.ContactMessages.FindAsync(contactId);
+        existingContact.Should().NotBeNull();
+
+        // Verify no files exist for this contact
+        var existingFiles = await _context.ContactFiles
+            .Where(f => f.ContactMessageId == contactId)
+            .ToListAsync();
+        existingFiles.Should().BeEmpty();
+
+        // Act
+        Func<Task> act = async () => await _contactService.DeleteContactFileAsync(contactId, fileId);
+
+        // Assert
+        await act.Should().ThrowAsync<Maliev.ContactService.Api.Exceptions.NotFoundException>();
+    }
+
+    [Fact]
+    public async Task GetContactFileByIdAsync_Should_Return_Null_When_File_Not_Exists()
+    {
+        // Arrange
+        var contactId = 1;
+        var fileId = 999; // Non-existent file ID
+
+        // Create a contact message first
+        var contact = new ContactMessage
+        {
+            FullName = "Test User",
+            Email = "test@example.com",
+            Subject = "Test Subject",
+            Message = "Test Message",
+            ContactType = ContactType.General,
+            Priority = Priority.Medium,
+            Status = ContactStatus.New,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        _context.ContactMessages.Add(contact);
+        await _context.SaveChangesAsync();
+
+        // Verify the contact exists
+        var existingContact = await _context.ContactMessages.FindAsync(contactId);
+        existingContact.Should().NotBeNull();
+
+        // Verify no files exist for this contact
+        var existingFiles = await _context.ContactFiles
+            .Where(f => f.ContactMessageId == contactId)
+            .ToListAsync();
+        existingFiles.Should().BeEmpty();
+
+        // Act
+        var result = await _contactService.GetContactFileByIdAsync(contactId, fileId);
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetContactFileByIdAsync_Should_Return_File_When_Exists()
+    {
+        // Arrange
+        var contact = new ContactMessage
+        {
+            FullName = "Test User",
+            Email = "test@example.com",
+            Subject = "Test Subject",
+            Message = "Test Message",
+            ContactType = ContactType.General,
+            Priority = Priority.Medium,
+            Status = ContactStatus.New,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        _context.ContactMessages.Add(contact);
+        await _context.SaveChangesAsync();
+
+        var contactFile = new ContactFile
+        {
+            ContactMessageId = contact.Id,
+            FileName = "test.pdf",
+            ObjectName = $"contacts/{contact.Id}/test.pdf",
+            FileSize = 1024,
+            ContentType = "application/pdf",
+            UploadServiceFileId = "upload-123",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        _context.ContactFiles.Add(contactFile);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _contactService.GetContactFileByIdAsync(contact.Id, contactFile.Id);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Id.Should().Be(contactFile.Id);
+        result.FileName.Should().Be("test.pdf");
+        result.ObjectName.Should().Be($"contacts/{contact.Id}/test.pdf");
+        result.FileSize.Should().Be(1024);
+        result.ContentType.Should().Be("application/pdf");
+        result.UploadServiceFileId.Should().Be("upload-123");
     }
 
     [Fact]
