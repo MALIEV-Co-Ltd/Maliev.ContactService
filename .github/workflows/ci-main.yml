@@ -1,0 +1,67 @@
+name: CI - Main
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Maliev.ContactService/**'
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./Maliev.ContactService
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: '9.x'
+
+    - name: Restore dependencies
+      run: dotnet restore Maliev.ContactService.sln
+
+    - name: Build solution
+      run: dotnet build Maliev.ContactService.sln --no-restore
+
+    - name: Run tests
+      run: dotnet test Maliev.ContactService.sln --no-build --verbosity normal
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v3
+      with:
+        credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+    - name: Configure Docker for GCR
+      run: gcloud auth configure-docker asia-southeast1-docker.pkg.dev
+
+    - name: Build and push Docker image
+      run: |
+        docker build -f Maliev.ContactService.Api/Dockerfile -t asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-prod/maliev-contact-service:${{ github.sha }} .
+        docker push asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-prod/maliev-contact-service:${{ github.sha }}
+
+    - name: Checkout GitOps repository
+      uses: actions/checkout@v5
+      with:
+        repository: 'MALIEV-Co-Ltd/maliev-gitops'
+        token: '${{ secrets.GITOPS_PAT }}'
+        path: 'maliev-gitops'
+
+    - name: Install Kustomize
+      run: |
+        curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+        sudo mv kustomize /usr/local/bin/
+
+    - name: Update GitOps repository
+      run: |
+        cd maliev-gitops/3-apps/contact-service/overlays/production
+        kustomize edit set image maliev-contact-service=asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-prod/maliev-contact-service:${{ github.sha }}
+        git config --global user.name 'github-actions[bot]'
+        git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+        git add . && git commit -m "Update contact-service image to ${{ github.sha }}"
+        git pull --rebase origin main && git push
