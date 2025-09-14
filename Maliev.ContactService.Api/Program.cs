@@ -315,6 +315,7 @@ try
     var app = builder.Build();
 
     app.UseForwardedHeaders();
+    app.UseHttpsRedirection(); // Move HTTPS redirection to be called early
 
     // Configure the HTTP request pipeline
     // Only enable Swagger in non-production environments for security
@@ -342,7 +343,7 @@ try
     }
 
     app.UseMiddleware<ExceptionHandlingMiddleware>();
-    app.UseHttpsRedirection();
+    // app.UseHttpsRedirection(); // Remove from here - moved above
 
     // MANDATORY: Prometheus metrics
     app.UseHttpMetrics();
