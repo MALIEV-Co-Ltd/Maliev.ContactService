@@ -24,73 +24,106 @@ public class ContactService : IContactService
 
     public async Task<ContactMessageDto> CreateContactMessageAsync(CreateContactMessageRequest request)
     {
-        var contactMessage = new ContactMessage
+        if (request == null)
         {
-            FullName = request.FullName,
-            Email = request.Email,
-            PhoneNumber = request.PhoneNumber,
-            Company = request.Company,
-            Subject = request.Subject,
-            Message = request.Message,
-            ContactType = request.ContactType,
-            Priority = request.Priority,
-            Status = ContactStatus.New,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
-
-        _context.ContactMessages.Add(contactMessage);
-        await _context.SaveChangesAsync();
-
-        // Add files if any
-        if (request.Files.Any())
-        {
-            foreach (var fileRequest in request.Files)
-            {
-                try
-                {
-                    // Generate object name: contacts/{contactId}/{timestamp}_{fileName}
-                    var objectName = $"contacts/{contactMessage.Id}/{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}_{fileRequest.FileName}";
-
-                    // Upload file to UploadService
-                    var uploadResponse = await _uploadService.UploadFileAsync(
-                        objectName,
-                        fileRequest.FileContent,
-                        fileRequest.ContentType ?? "application/octet-stream",
-                        fileRequest.FileName);
-
-                    // Store file metadata in database
-                    var contactFile = new ContactFile
-                    {
-                        ContactMessageId = contactMessage.Id,
-                        FileName = fileRequest.FileName,
-                        ObjectName = objectName,
-                        FileSize = uploadResponse.FileSize,
-                        ContentType = fileRequest.ContentType ?? "application/octet-stream",
-                        UploadServiceFileId = uploadResponse.FileId,
-                        CreatedAt = DateTime.UtcNow
-                    };
-
-                    _context.ContactFiles.Add(contactFile);
-                    _logger.LogInformation("File uploaded for contact {ContactId}: {FileName} -> {FileId}",
-                        contactMessage.Id, fileRequest.FileName, uploadResponse.FileId);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to upload file {FileName} for contact {ContactId}",
-                        fileRequest.FileName, contactMessage.Id);
-
-                    // Continue with other files - don't fail the entire contact creation
-                    // You might want to store failed uploads with a different status
-                }
-            }
-
-            await _context.SaveChangesAsync();
+            throw new ArgumentNullException(nameof(request));
         }
 
-        _logger.LogInformation("Created contact message {ContactId} from {Email}", contactMessage.Id, contactMessage.Email);
+        // Check if the database provider supports transactions
+        var isTransactionSupported = _context.Database.ProviderName != "Microsoft.EntityFrameworkCore.InMemory";
+        var transaction = isTransactionSupported ? await _context.Database.BeginTransactionAsync() : null;
 
-        return await GetContactMessageByIdAsync(contactMessage.Id) ?? throw new InvalidOperationException("Failed to retrieve created contact message");
+        try
+        {
+            var contactMessage = new ContactMessage
+            {
+                FullName = request.FullName,
+                Email = request.Email,
+                PhoneNumber = request.PhoneNumber,
+                Company = request.Company,
+                Subject = request.Subject,
+                Message = request.Message,
+                ContactType = request.ContactType,
+                Priority = request.Priority,
+                Status = ContactStatus.New,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            _context.ContactMessages.Add(contactMessage);
+            await _context.SaveChangesAsync();
+
+            // Add files if any
+            if (request.Files.Any())
+            {
+                foreach (var fileRequest in request.Files)
+                {
+                    try
+                    {
+                        // Generate object name: contacts/{contactId}/{timestamp}_{fileName}
+                        var objectName = $"contacts/{contactMessage.Id}/{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}_{fileRequest.FileName}";
+
+                        // Upload file to UploadService
+                        var uploadResponse = await _uploadService.UploadFileAsync(
+                            objectName,
+                            fileRequest.FileContent,
+                            fileRequest.ContentType ?? "application/octet-stream",
+                            fileRequest.FileName);
+
+                        // Store file metadata in database
+                        var contactFile = new ContactFile
+                        {
+                            ContactMessageId = contactMessage.Id,
+                            FileName = fileRequest.FileName,
+                            ObjectName = objectName,
+                            FileSize = uploadResponse.FileSize,
+                            ContentType = fileRequest.ContentType ?? "application/octet-stream",
+                            UploadServiceFileId = uploadResponse.FileId,
+                            CreatedAt = DateTime.UtcNow
+                        };
+
+                        _context.ContactFiles.Add(contactFile);
+                        _logger.LogInformation("File uploaded for contact {ContactId}: {FileName} -> {FileId}",
+                            contactMessage.Id, fileRequest.FileName, uploadResponse.FileId);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to upload file {FileName} for contact {ContactId}",
+                            fileRequest.FileName, contactMessage.Id);
+
+                        // Continue with other files - don't fail the entire contact creation
+                        // You might want to store failed uploads with a different status
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+            }
+
+            if (transaction != null)
+            {
+                await transaction.CommitAsync();
+            }
+            
+            _logger.LogInformation("Created contact message {ContactId} from {Email}", contactMessage.Id, contactMessage.Email);
+
+            return await GetContactMessageByIdAsync(contactMessage.Id) ?? throw new InvalidOperationException("Failed to retrieve created contact message");
+        }
+        catch (Exception ex)
+        {
+            if (transaction != null)
+            {
+                await transaction.RollbackAsync();
+            }
+            _logger.LogError(ex, "Failed to create contact message");
+            throw; // Re-throw the exception to be handled by the global exception handler
+        }
+        finally
+        {
+            if (transaction != null)
+            {
+                await transaction.DisposeAsync();
+            }
+        }
     }
 
     public async Task<ContactMessageDto?> GetContactMessageByIdAsync(int id)
@@ -139,10 +172,11 @@ public class ContactService : IContactService
         return contacts.Select(MapToDto);
     }
 
-    public async Task<ContactMessageDto?> UpdateContactStatusAsync(int id, UpdateContactStatusRequest request)
+    public async Task<ContactMessageDto> UpdateContactStatusAsync(int id, UpdateContactStatusRequest request)
     {
         var contact = await _context.ContactMessages.FindAsync(id);
-        if (contact == null) return null;
+        if (contact == null) 
+            throw new Maliev.ContactService.Api.Exceptions.NotFoundException($"Contact message with id {id} not found");
 
         contact.Status = request.Status;
         if (request.Priority.HasValue)
@@ -162,13 +196,14 @@ public class ContactService : IContactService
 
         _logger.LogInformation("Updated contact message {ContactId} status to {Status}", id, request.Status);
 
-        return await GetContactMessageByIdAsync(id);
+        return await GetContactMessageByIdAsync(id) ?? throw new InvalidOperationException("Failed to retrieve updated contact message");
     }
 
-    public async Task<bool> DeleteContactMessageAsync(int id)
+    public async Task DeleteContactMessageAsync(int id)
     {
         var contact = await _context.ContactMessages.FindAsync(id);
-        if (contact == null) return false;
+        if (contact == null) 
+            throw new Maliev.ContactService.Api.Exceptions.NotFoundException($"Contact message with id {id} not found");
 
         _context.ContactMessages.Remove(contact);
         await _context.SaveChangesAsync();
@@ -177,7 +212,6 @@ public class ContactService : IContactService
         _cache.Remove($"contact_message_{id}");
 
         _logger.LogInformation("Deleted contact message {ContactId}", id);
-        return true;
     }
 
     public async Task<IEnumerable<ContactFileDto>> GetContactFilesAsync(int contactId)
@@ -198,12 +232,13 @@ public class ContactService : IContactService
         });
     }
 
-    public async Task<bool> DeleteContactFileAsync(int contactId, int fileId)
+    public async Task DeleteContactFileAsync(int contactId, int fileId)
     {
         var file = await _context.ContactFiles
             .FirstOrDefaultAsync(f => f.Id == fileId && f.ContactMessageId == contactId);
 
-        if (file == null) return false;
+        if (file == null) 
+            throw new Maliev.ContactService.Api.Exceptions.NotFoundException($"Contact file with id {fileId} for contact {contactId} not found");
 
         // Delete from UploadService first (if we have the file ID)
         if (!string.IsNullOrEmpty(file.UploadServiceFileId))
@@ -228,7 +263,6 @@ public class ContactService : IContactService
         _cache.Remove($"contact_message_{contactId}");
 
         _logger.LogInformation("Deleted contact file {FileId} from contact {ContactId}", fileId, contactId);
-        return true;
     }
 
     private static ContactMessageDto MapToDto(ContactMessage contact)
