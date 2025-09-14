@@ -145,6 +145,7 @@ public class ContactService : IContactService
 
         var contactDto = MapToDto(contact);
         var cacheEntryOptions = new MemoryCacheEntryOptions()
+            .SetSize(1) // Set size of cache entry
             .SetAbsoluteExpiration(CacheExpiry)
             .AddExpirationToken(new CancellationChangeToken(_cacheCts.Token));
         
@@ -193,6 +194,7 @@ public class ContactService : IContactService
         
         // Cache the result with cancellation token for invalidation
         var cacheEntryOptions = new MemoryCacheEntryOptions()
+            .SetSize(1) // Set size of cache entry
             .SetAbsoluteExpiration(CacheExpiry)
             .AddExpirationToken(new CancellationChangeToken(_cacheCts.Token));
         

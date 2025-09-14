@@ -70,8 +70,11 @@ try
         });
     }
 
-    // Configure memory cache (simple configuration without SizeLimit)
-    builder.Services.AddMemoryCache();
+    // Configure memory cache with size limit to prevent unbounded growth
+    builder.Services.AddMemoryCache(options =>
+    {
+        options.SizeLimit = 1024; // Set a reasonable size limit in your preferred units
+    });
 
     // Configure rate limiting
     builder.Services.AddRateLimiter(options =>
