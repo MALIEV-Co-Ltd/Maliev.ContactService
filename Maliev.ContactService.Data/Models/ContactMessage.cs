@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Maliev.ContactService.Data.Models;
 
-public class ContactMessage
+public class ContactMessage : IAuditable
 {
     [Key]
     public int Id { get; set; }

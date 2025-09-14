@@ -12,6 +12,36 @@ public class ContactDbContext : DbContext
     public DbSet<ContactMessage> ContactMessages { get; set; }
     public DbSet<ContactFile> ContactFiles { get; set; }
 
+    public override int SaveChanges()
+    {
+        AddTimestamps();
+        return base.SaveChanges();
+    }
+
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        AddTimestamps();
+        return await base.SaveChangesAsync(cancellationToken);
+    }
+
+    private void AddTimestamps()
+    {
+        var entities = ChangeTracker.Entries()
+            .Where(x => x.Entity is IAuditable && (x.State == EntityState.Added || x.State == EntityState.Modified));
+
+        foreach (var entity in entities)
+        {
+            var now = DateTime.UtcNow;
+
+            if (entity.State == EntityState.Added)
+            {
+                ((IAuditable)entity.Entity).CreatedAt = now;
+            }
+
+            ((IAuditable)entity.Entity).UpdatedAt = now;
+        }
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -59,12 +89,10 @@ public class ContactDbContext : DbContext
                 .HasConversion<int>();
 
             entity.Property(e => e.CreatedAt)
-                .IsRequired()
-                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                .IsRequired();
 
             entity.Property(e => e.UpdatedAt)
-                .IsRequired()
-                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                .IsRequired();
 
             // Indexes for performance
             entity.HasIndex(e => e.Email);
@@ -97,8 +125,10 @@ public class ContactDbContext : DbContext
                 .HasMaxLength(100);
 
             entity.Property(e => e.CreatedAt)
-                .IsRequired()
-                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                .IsRequired();
+
+            entity.Property(e => e.UpdatedAt)
+                .IsRequired();
 
             // Foreign key relationship
             entity.HasOne(cf => cf.ContactMessage)

@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Maliev.ContactService.Data.Models;
 
-public class ContactFile
+public class ContactFile : IAuditable
 {
     [Key]
     public int Id { get; set; }
@@ -30,6 +30,9 @@ public class ContactFile
 
     [Required]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    [Required]
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation property
     public virtual ContactMessage ContactMessage { get; set; } = null!;
