@@ -494,6 +494,160 @@ public class ContactServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task UpdateContactStatusAsync_Should_Invalidate_Cache()
+    {
+        // Arrange
+        var contact = new ContactMessage
+        {
+            FullName = "Cache Test User",
+            Email = "cache@example.com",
+            Subject = "Cache Test Subject",
+            Message = "Cache Test Message",
+            ContactType = ContactType.General,
+            Priority = Priority.Medium,
+            Status = ContactStatus.New,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        _context.ContactMessages.Add(contact);
+        await _context.SaveChangesAsync();
+
+        // Prime the cache by fetching the contact
+        var cachedResult = await _contactService.GetContactMessageByIdAsync(contact.Id);
+        cachedResult.Should().NotBeNull();
+        cachedResult!.Status.Should().Be(ContactStatus.New);
+
+        // Verify that the item is in cache
+        var cacheKey = $"contact_message_{contact.Id}";
+        _cache.Get(cacheKey).Should().NotBeNull();
+
+        var updateRequest = new UpdateContactStatusRequest
+        {
+            Status = ContactStatus.InProgress
+        };
+
+        // Act
+        var updatedResult = await _contactService.UpdateContactStatusAsync(contact.Id, updateRequest);
+
+        // Assert
+        // Cache should be invalidated and repopulated with updated data
+        var cachedAfterUpdate = _cache.Get(cacheKey);
+        cachedAfterUpdate.Should().NotBeNull();
+        
+        // The cached data should reflect the updated status
+        var cachedDto = cachedAfterUpdate as ContactMessageDto;
+        cachedDto.Should().NotBeNull();
+        cachedDto!.Status.Should().Be(ContactStatus.InProgress);
+        
+        // The returned result should also have the updated status
+        updatedResult.Status.Should().Be(ContactStatus.InProgress);
+    }
+
+    [Fact]
+    public async Task DeleteContactMessageAsync_Should_Invalidate_Cache()
+    {
+        // Arrange
+        var contact = new ContactMessage
+        {
+            FullName = "Delete Cache Test User",
+            Email = "deletecache@example.com",
+            Subject = "Delete Cache Test Subject",
+            Message = "Delete Cache Test Message",
+            ContactType = ContactType.General,
+            Priority = Priority.Medium,
+            Status = ContactStatus.New,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        _context.ContactMessages.Add(contact);
+        await _context.SaveChangesAsync();
+
+        // Prime the cache by fetching the contact
+        var cachedResult = await _contactService.GetContactMessageByIdAsync(contact.Id);
+        cachedResult.Should().NotBeNull();
+
+        // Verify that the item is in cache
+        var cacheKey = $"contact_message_{contact.Id}";
+        _cache.Get(cacheKey).Should().NotBeNull();
+
+        // Act
+        await _contactService.DeleteContactMessageAsync(contact.Id);
+
+        // Assert
+        // Cache should be invalidated after delete (item should no longer exist)
+        _cache.Get(cacheKey).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task DeleteContactFileAsync_Should_Invalidate_Parent_Contact_Cache()
+    {
+        // Arrange
+        var contact = new ContactMessage
+        {
+            FullName = "File Delete Cache Test User",
+            Email = "filedeletecache@example.com",
+            Subject = "File Delete Cache Test Subject",
+            Message = "File Delete Cache Test Message",
+            ContactType = ContactType.General,
+            Priority = Priority.Medium,
+            Status = ContactStatus.New,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        _context.ContactMessages.Add(contact);
+        await _context.SaveChangesAsync();
+
+        var contactFile = new ContactFile
+        {
+            ContactMessageId = contact.Id,
+            FileName = "test.pdf",
+            ObjectName = $"contacts/{contact.Id}/test.pdf",
+            FileSize = 1024,
+            ContentType = "application/pdf",
+            UploadServiceFileId = "upload-789",
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _context.ContactFiles.Add(contactFile);
+        await _context.SaveChangesAsync();
+
+        // Prime the cache by fetching the contact
+        var cachedResult = await _contactService.GetContactMessageByIdAsync(contact.Id);
+        cachedResult.Should().NotBeNull();
+        cachedResult!.Files.Should().HaveCount(1);
+
+        // Verify that the item is in cache
+        var cacheKey = $"contact_message_{contact.Id}";
+        var cachedItem = _cache.Get(cacheKey);
+        cachedItem.Should().NotBeNull();
+
+        _uploadServiceMock.Setup(x => x.DeleteFileAsync("upload-789"))
+            .ReturnsAsync(true);
+
+        // Act
+        await _contactService.DeleteContactFileAsync(contact.Id, contactFile.Id);
+
+        // Assert
+        // Cache should be invalidated after file delete
+        _cache.Get(cacheKey).Should().BeNull();
+    }
+
+    [Fact(Skip = "List caching not currently implemented, but this test documents expected behavior if it were")]
+    public void UpdateContactStatusAsync_Should_Invalidate_List_Cache_If_Implemented()
+    {
+        // This test documents the expected behavior if list caching were implemented.
+        // When individual contacts are updated, any cached lists containing that contact
+        // should also be invalidated to maintain data consistency.
+        
+        // Currently, GetContactMessagesAsync doesn't use caching, so this test is skipped.
+        // If list caching were implemented in the future, this test should be updated
+        // to verify that list caches are properly invalidated when individual contacts change.
+    }
+
+    [Fact]
     public async Task CreateContactMessageAsync_Should_Rollback_When_FileUpload_Fails_After_Save()
     {
         // Arrange
