@@ -648,6 +648,63 @@ public class ContactServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task DeleteContactMessageAsync_Should_Invalidate_All_Cache_Entries()
+    {
+        // Arrange
+        var contact1 = new ContactMessage
+        {
+            FullName = "User 1",
+            Email = "user1@example.com",
+            Subject = "Subject 1",
+            Message = "Message 1",
+            ContactType = ContactType.General,
+            Priority = Priority.Medium,
+            Status = ContactStatus.New,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        var contact2 = new ContactMessage
+        {
+            FullName = "User 2",
+            Email = "user2@example.com",
+            Subject = "Subject 2",
+            Message = "Message 2",
+            ContactType = ContactType.Business,
+            Priority = Priority.High,
+            Status = ContactStatus.New,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        _context.ContactMessages.AddRange(contact1, contact2);
+        await _context.SaveChangesAsync();
+
+        // Prime the cache by fetching individual contacts
+        var cachedContact1 = await _contactService.GetContactMessageByIdAsync(contact1.Id);
+        var cachedContact2 = await _contactService.GetContactMessageByIdAsync(contact2.Id);
+        cachedContact1.Should().NotBeNull();
+        cachedContact2.Should().NotBeNull();
+
+        // Prime the cache by fetching contact lists
+        var cachedList = await _contactService.GetContactMessagesAsync(page: 1, pageSize: 10);
+        cachedList.Should().NotBeNull();
+
+        // Verify that items are in cache
+        _cache.Get($"contact_message_{contact1.Id}").Should().NotBeNull();
+        _cache.Get($"contact_message_{contact2.Id}").Should().NotBeNull();
+
+        // Act
+        await _contactService.DeleteContactMessageAsync(contact1.Id);
+
+        // Assert
+        // All cache entries should be invalidated after delete
+        // The cache entries should be null because we're using CancellationTokenSource for invalidation
+        _cache.Get($"contact_message_{contact1.Id}").Should().BeNull();
+        _cache.Get($"contact_message_{contact2.Id}").Should().BeNull();
+    }
+
+    [Fact]
     public async Task CreateContactMessageAsync_Should_Rollback_When_FileUpload_Fails_After_Save()
     {
         // Arrange

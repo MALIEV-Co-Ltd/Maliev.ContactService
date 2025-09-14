@@ -3,6 +3,7 @@ using Maliev.ContactService.Data.DbContexts;
 using Maliev.ContactService.Data.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Primitives;
 
 namespace Maliev.ContactService.Api.Services;
 
@@ -13,6 +14,7 @@ public class ContactService : IContactService
     private readonly IUploadServiceClient _uploadService;
     private readonly ILogger<ContactService> _logger;
     private static readonly TimeSpan CacheExpiry = TimeSpan.FromMinutes(5);
+    private static CancellationTokenSource _cacheCts = new CancellationTokenSource();
 
     public ContactService(ContactDbContext context, IMemoryCache cache, IUploadServiceClient uploadService, ILogger<ContactService> logger)
     {
@@ -142,7 +144,11 @@ public class ContactService : IContactService
         if (contact == null) return null;
 
         var contactDto = MapToDto(contact);
-        _cache.Set(cacheKey, contactDto, CacheExpiry);
+        var cacheEntryOptions = new MemoryCacheEntryOptions()
+            .SetAbsoluteExpiration(CacheExpiry)
+            .AddExpirationToken(new CancellationChangeToken(_cacheCts.Token));
+        
+        _cache.Set(cacheKey, contactDto, cacheEntryOptions);
 
         return contactDto;
     }
@@ -153,6 +159,19 @@ public class ContactService : IContactService
         ContactStatus? status = null,
         ContactType? contactType = null)
     {
+        // Create a cache key based on the parameters
+        var cacheKey = $"contact_messages_page{page}_size{pageSize}";
+        if (status.HasValue)
+            cacheKey += $"_status{status.Value}";
+        if (contactType.HasValue)
+            cacheKey += $"_type{contactType.Value}";
+
+        // Try to get from cache first
+        if (_cache.TryGetValue(cacheKey, out IEnumerable<ContactMessageDto>? cachedContacts))
+        {
+            return cachedContacts ?? Enumerable.Empty<ContactMessageDto>();
+        }
+
         var query = _context.ContactMessages
             .Include(c => c.Files)
             .AsQueryable();
@@ -169,7 +188,16 @@ public class ContactService : IContactService
             .Take(pageSize)
             .ToListAsync();
 
-        return contacts.Select(MapToDto);
+        var result = contacts.Select(MapToDto).ToList();
+        
+        // Cache the result with cancellation token for invalidation
+        var cacheEntryOptions = new MemoryCacheEntryOptions()
+            .SetAbsoluteExpiration(CacheExpiry)
+            .AddExpirationToken(new CancellationChangeToken(_cacheCts.Token));
+        
+        _cache.Set(cacheKey, result, cacheEntryOptions);
+
+        return result;
     }
 
     public async Task<ContactMessageDto> UpdateContactStatusAsync(int id, UpdateContactStatusRequest request)
@@ -191,8 +219,8 @@ public class ContactService : IContactService
 
         await _context.SaveChangesAsync();
 
-        // Clear cache
-        _cache.Remove($"contact_message_{id}");
+        // Invalidate all cache entries
+        InvalidateAllCache();
 
         _logger.LogInformation("Updated contact message {ContactId} status to {Status}", id, request.Status);
 
@@ -208,8 +236,8 @@ public class ContactService : IContactService
         _context.ContactMessages.Remove(contact);
         await _context.SaveChangesAsync();
 
-        // Clear cache
-        _cache.Remove($"contact_message_{id}");
+        // Invalidate all cache entries
+        InvalidateAllCache();
 
         _logger.LogInformation("Deleted contact message {ContactId}", id);
     }
@@ -259,10 +287,17 @@ public class ContactService : IContactService
         _context.ContactFiles.Remove(file);
         await _context.SaveChangesAsync();
 
-        // Clear parent contact cache
-        _cache.Remove($"contact_message_{contactId}");
+        // Invalidate all cache entries
+        InvalidateAllCache();
 
         _logger.LogInformation("Deleted contact file {FileId} from contact {ContactId}", fileId, contactId);
+    }
+
+    private static void InvalidateAllCache()
+    {
+        _cacheCts.Cancel();
+        _cacheCts.Dispose();
+        _cacheCts = new CancellationTokenSource();
     }
 
     private static ContactMessageDto MapToDto(ContactMessage contact)
