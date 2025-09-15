@@ -61,3 +61,4 @@ nunit-*.xml
 gha-creds-*.json
 migration_source/
 reference_project/
+.vs/

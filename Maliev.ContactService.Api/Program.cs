@@ -81,31 +81,25 @@ try
     {
         options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-        // Global rate limit
-        options.AddPolicy("GlobalPolicy", context =>
-            RateLimitPartition.GetSlidingWindowLimiter(
-                partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                factory: _ => new SlidingWindowRateLimiterOptions
-                {
-                    PermitLimit = 1000,
-                    Window = TimeSpan.FromMinutes(1),
-                    SegmentsPerWindow = 2,
-                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                    QueueLimit = 100
-                }));
+        var rateLimitingConfig = builder.Configuration.GetSection("RateLimiting");
+        var fixedWindowOptions = rateLimitingConfig.GetSection("FixedWindow").Get<FixedWindowRateLimiterOptions>();
+        var globalFixedWindowOptions = rateLimitingConfig.GetSection("GlobalFixedWindow").Get<FixedWindowRateLimiterOptions>();
 
-        // Contact form submission rate limit (more restrictive)
-        options.AddPolicy("ContactPolicy", context =>
-            RateLimitPartition.GetSlidingWindowLimiter(
-                partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                factory: _ => new SlidingWindowRateLimiterOptions
-                {
-                    PermitLimit = 10,
-                    Window = TimeSpan.FromMinutes(1),
-                    SegmentsPerWindow = 2,
-                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                    QueueLimit = 5
-                }));
+        if (globalFixedWindowOptions != null)
+        {
+            options.AddPolicy("GlobalPolicy", context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    factory: _ => globalFixedWindowOptions));
+        }
+
+        if (fixedWindowOptions != null)
+        {
+            options.AddPolicy("ContactPolicy", context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    factory: _ => fixedWindowOptions));
+        }
     });
 
     // Configure UploadService options

@@ -13,20 +13,16 @@ namespace Maliev.ContactService.Tests.Integration;
 /// Integration tests for rate limiting functionality
 /// </summary>
 [Trait("Category", "Integration")]
-public class RateLimitingIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
+public class RateLimitingIntegrationTests : IClassFixture<CustomWebApplicationFactory<Program>>
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly CustomWebApplicationFactory<Program> _factory;
 
-    public RateLimitingIntegrationTests()
+    public RateLimitingIntegrationTests(CustomWebApplicationFactory<Program> factory)
     {
-        _factory = new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(builder =>
-            {
-                builder.UseEnvironment("Testing");
-            });
+        _factory = factory;
     }
 
-    [Fact(Skip = "Rate limiting tests require specific configuration for testing environment")]
+    [Fact]
     public async Task CreateContactMessage_Should_Be_Rate_Limited()
     {
         // Arrange
@@ -40,8 +36,8 @@ public class RateLimitingIntegrationTests : IClassFixture<WebApplicationFactory<
             ContactType = ContactType.General
         };
 
-        // Act - Make 10 requests (the limit is 10 per minute)
-        for (int i = 0; i < 10; i++)
+        // Act - Make 5 requests (the limit is 5 per 10 seconds)
+        for (int i = 0; i < 5; i++)
         {
             var response = await client.PostAsJsonAsync("/v1/contacts", request);
             response.StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests, 
@@ -55,7 +51,7 @@ public class RateLimitingIntegrationTests : IClassFixture<WebApplicationFactory<
         rateLimitedResponse.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
     }
 
-    [Fact(Skip = "Rate limiting tests require specific configuration for testing environment")]
+    [Fact]
     public async Task CreateContactMessage_Should_Allow_Requests_After_Rate_Limit_Period()
     {
         // Arrange
@@ -69,14 +65,14 @@ public class RateLimitingIntegrationTests : IClassFixture<WebApplicationFactory<
             ContactType = ContactType.General
         };
 
-        // Act - Make 10 requests to hit the rate limit
-        for (int i = 0; i < 10; i++)
+        // Act - Make 5 requests to hit the rate limit
+        for (int i = 0; i < 5; i++)
         {
             await client.PostAsJsonAsync("/v1/contacts", request);
         }
 
-        // Wait for rate limit window to reset (1 minute)
-        await Task.Delay(TimeSpan.FromMinutes(1) + TimeSpan.FromSeconds(1));
+        // Wait for rate limit window to reset (10 seconds)
+        await Task.Delay(TimeSpan.FromSeconds(11));
 
         // Make another request which should be allowed now
         var response = await client.PostAsJsonAsync("/v1/contacts", request);
