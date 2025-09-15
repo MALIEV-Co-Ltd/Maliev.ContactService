@@ -59,9 +59,9 @@ jobs:
 
     - name: Update GitOps repository
       run: |
-        cd maliev-gitops/3-apps/contact-service/overlays/staging
+        cd maliev-gitops/3-apps/maliev-contact-service/overlays/staging
         kustomize edit set image maliev-contact-service=asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-staging/maliev-contact-service:${{ github.sha }}
         git config --global user.name 'github-actions[bot]'
         git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-        git add . && git commit -m "Update contact-service image to ${{ github.sha }}"
+        git add . && git commit -m "Update maliev-contact-service image to ${{ github.sha }}"
         git pull --rebase origin main && git push
