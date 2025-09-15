@@ -40,12 +40,12 @@ public class ContactMessage : IAuditable
     public ContactStatus Status { get; set; } = ContactStatus.New;
 
     [Required]
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     [Required]
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
-    public DateTime? ResolvedAt { get; set; }
+    public DateTimeOffset? ResolvedAt { get; set; }
 
     // Navigation property
     public virtual ICollection<ContactFile> Files { get; set; } = new List<ContactFile>();

@@ -349,20 +349,17 @@ public class ContactsControllerTests
     public async Task DownloadContactFile_Should_Return_File_When_Exists()
     {
         // Arrange
-        var contactId = 1;
+        var id = 1;  // This is the contactId
         var fileId = 1;
-        var files = new List<ContactFileDto>
+        var file = new ContactFileDto
         {
-            new ContactFileDto
-            {
-                Id = fileId,
-                FileName = "document.pdf",
-                ObjectName = "contacts/1/document.pdf",
-                FileSize = 1024,
-                ContentType = "application/pdf",
-                UploadServiceFileId = "upload-123",
-                CreatedAt = DateTime.UtcNow
-            }
+            Id = fileId,
+            FileName = "document.pdf",
+            ObjectName = "contacts/1/document.pdf",
+            FileSize = 1024,
+            ContentType = "application/pdf",
+            UploadServiceFileId = "upload-123",
+            CreatedAt = DateTime.UtcNow
         };
 
         var downloadResponse = new FileDownloadResponse
@@ -373,15 +370,26 @@ public class ContactsControllerTests
             FileSize = 5
         };
 
-        _contactServiceMock.Setup(x => x.GetContactFilesAsync(contactId))
-            .ReturnsAsync(files);
+        _contactServiceMock.Setup(x => x.GetContactFileByIdAsync(id, fileId))
+            .Callback<int, int>((contactId, fileId) => 
+                Console.WriteLine($"GetContactFileByIdAsync called with contactId: {contactId}, fileId: {fileId}"))
+            .ReturnsAsync(file);
 
         _uploadServiceMock.Setup(x => x.DownloadFileAsync("upload-123"))
+            .Callback<string>(fileId => 
+                Console.WriteLine($"DownloadFileAsync called with fileId: {fileId}"))
             .ReturnsAsync(downloadResponse);
 
         // Act
         // Note: Not using ConfigureAwait(false) in test methods as it's not recommended by xUnit
-        var result = await _controller.DownloadContactFile(contactId, fileId);
+        Console.WriteLine($"Calling DownloadContactFile with id: {id}, fileId: {fileId}");
+        var result = await _controller.DownloadContactFile(id, fileId);
+        Console.WriteLine($"DownloadContactFile returned: {result.GetType().Name}");
+
+        // Debug: Print the file object to see what's being returned
+        Console.WriteLine($"File object: {file}");
+        Console.WriteLine($"File.UploadServiceFileId: {file.UploadServiceFileId}");
+        Console.WriteLine($"Is UploadServiceFileId null or empty: {string.IsNullOrEmpty(file.UploadServiceFileId)}");
 
         // Assert
         result.Should().BeOfType<FileContentResult>();
@@ -397,10 +405,9 @@ public class ContactsControllerTests
         // Arrange
         var contactId = 1;
         var fileId = 999;
-        var files = new List<ContactFileDto>();
 
-        _contactServiceMock.Setup(x => x.GetContactFilesAsync(contactId))
-            .ReturnsAsync(files);
+        _contactServiceMock.Setup(x => x.GetContactFileByIdAsync(contactId, fileId))
+            .ReturnsAsync((ContactFileDto?)null);
 
         // Act
         // Note: Not using ConfigureAwait(false) in test methods as it's not recommended by xUnit

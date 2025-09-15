@@ -15,5 +15,6 @@ public interface IContactService
     Task<ContactMessageDto> UpdateContactStatusAsync(int id, UpdateContactStatusRequest request);
     Task DeleteContactMessageAsync(int id);
     Task<IEnumerable<ContactFileDto>> GetContactFilesAsync(int contactId);
+    Task<ContactFileDto?> GetContactFileByIdAsync(int contactId, int fileId);
     Task DeleteContactFileAsync(int contactId, int fileId);
 }

@@ -14,9 +14,9 @@ public class ContactMessageDto
     public ContactType ContactType { get; set; }
     public Priority Priority { get; set; }
     public ContactStatus Status { get; set; }
-    public DateTime CreatedAt { get; set; }
-    public DateTime UpdatedAt { get; set; }
-    public DateTime? ResolvedAt { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+    public DateTimeOffset? ResolvedAt { get; set; }
     public List<ContactFileDto> Files { get; set; } = new();
 }
 
@@ -28,5 +28,5 @@ public class ContactFileDto
     public long? FileSize { get; set; }
     public string? ContentType { get; set; }
     public string? UploadServiceFileId { get; set; }
-    public DateTime CreatedAt { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
 }

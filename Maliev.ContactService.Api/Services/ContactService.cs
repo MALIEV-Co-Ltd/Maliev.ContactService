@@ -48,8 +48,8 @@ public class ContactService : IContactService
                 ContactType = request.ContactType,
                 Priority = request.Priority,
                 Status = ContactStatus.New,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
             };
 
             _context.ContactMessages.Add(contactMessage);
@@ -81,7 +81,7 @@ public class ContactService : IContactService
                             FileSize = uploadResponse.FileSize,
                             ContentType = fileRequest.ContentType ?? "application/octet-stream",
                             UploadServiceFileId = uploadResponse.FileId,
-                            CreatedAt = DateTime.UtcNow
+                            CreatedAt = DateTimeOffset.UtcNow
                         };
 
                         _context.ContactFiles.Add(contactFile);
@@ -213,11 +213,11 @@ public class ContactService : IContactService
         if (request.Priority.HasValue)
             contact.Priority = request.Priority.Value;
 
-        contact.UpdatedAt = DateTime.UtcNow;
+        contact.UpdatedAt = DateTimeOffset.UtcNow;
 
         if (request.Status == ContactStatus.Resolved && !contact.ResolvedAt.HasValue)
         {
-            contact.ResolvedAt = DateTime.UtcNow;
+            contact.ResolvedAt = DateTimeOffset.UtcNow;
         }
 
         await _context.SaveChangesAsync();
@@ -261,6 +261,25 @@ public class ContactService : IContactService
             UploadServiceFileId = f.UploadServiceFileId,
             CreatedAt = f.CreatedAt
         });
+    }
+
+    public async Task<ContactFileDto?> GetContactFileByIdAsync(int contactId, int fileId)
+    {
+        var file = await _context.ContactFiles
+            .Where(f => f.ContactMessageId == contactId && f.Id == fileId)
+            .Select(f => new ContactFileDto
+            {
+                Id = f.Id,
+                FileName = f.FileName,
+                ObjectName = f.ObjectName,
+                FileSize = f.FileSize,
+                ContentType = f.ContentType,
+                UploadServiceFileId = f.UploadServiceFileId,
+                CreatedAt = f.CreatedAt
+            })
+            .FirstOrDefaultAsync();
+
+        return file;
     }
 
     public async Task DeleteContactFileAsync(int contactId, int fileId)

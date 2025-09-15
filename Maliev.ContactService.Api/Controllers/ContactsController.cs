@@ -205,8 +205,7 @@ public class ContactsController : ControllerBase
     {
         try
         {
-            var files = await _contactService.GetContactFilesAsync(id);
-            var file = files.FirstOrDefault(f => f.Id == fileId);
+            var file = await _contactService.GetContactFileByIdAsync(id, fileId);
 
             if (file == null || string.IsNullOrEmpty(file.UploadServiceFileId))
             {

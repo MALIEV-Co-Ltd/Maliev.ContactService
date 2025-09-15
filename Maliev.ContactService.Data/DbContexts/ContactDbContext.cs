@@ -32,19 +32,19 @@ public class ContactDbContext : DbContext
         foreach (var entity in entities)
         {
             var auditableEntity = (IAuditable)entity.Entity;
-            var now = DateTime.UtcNow;
+            var now = DateTimeOffset.UtcNow;
 
             if (entity.State == EntityState.Added)
             {
-                // Only set CreatedAt if it hasn't been explicitly set (is default DateTime)
-                if (auditableEntity.CreatedAt == DateTime.MinValue)
+                // Only set CreatedAt if it hasn't been explicitly set (is default DateTimeOffset)
+                if (auditableEntity.CreatedAt == DateTimeOffset.MinValue)
                 {
                     auditableEntity.CreatedAt = now;
                 }
             }
 
-            // Only set UpdatedAt if it hasn't been explicitly set (is default DateTime)
-            if (auditableEntity.UpdatedAt == DateTime.MinValue)
+            // Only set UpdatedAt if it hasn't been explicitly set (is default DateTimeOffset)
+            if (auditableEntity.UpdatedAt == DateTimeOffset.MinValue)
             {
                 auditableEntity.UpdatedAt = now;
             }
@@ -98,10 +98,12 @@ public class ContactDbContext : DbContext
                 .HasConversion<int>();
 
             entity.Property(e => e.CreatedAt)
-                .IsRequired();
+                .IsRequired()
+                .HasDefaultValueSql("NOW()");
 
             entity.Property(e => e.UpdatedAt)
-                .IsRequired();
+                .IsRequired()
+                .HasDefaultValueSql("NOW()");
 
             // Indexes for performance
             entity.HasIndex(e => e.Email);
@@ -134,10 +136,12 @@ public class ContactDbContext : DbContext
                 .HasMaxLength(100);
 
             entity.Property(e => e.CreatedAt)
-                .IsRequired();
+                .IsRequired()
+                .HasDefaultValueSql("NOW()");
 
             entity.Property(e => e.UpdatedAt)
-                .IsRequired();
+                .IsRequired()
+                .HasDefaultValueSql("NOW()");
 
             // Foreign key relationship
             entity.HasOne(cf => cf.ContactMessage)
