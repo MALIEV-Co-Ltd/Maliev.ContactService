@@ -325,7 +325,8 @@ try
     app.UseHttpsRedirection(); // Move HTTPS redirection to be called early
 
     // Configure the HTTP request pipeline
-    // Only enable Swagger in non-production environments for security
+    // Enable Swagger in non-production environments
+    // For dev cluster: set ASPNETCORE_ENVIRONMENT=Development in deployment config
     if (!app.Environment.IsProduction())
     {
         app.UseSwagger(c =>
