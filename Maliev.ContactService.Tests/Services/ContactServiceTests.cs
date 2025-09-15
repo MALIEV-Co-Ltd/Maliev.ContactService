@@ -259,7 +259,7 @@ public class ContactServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task GetContactMessagesAsync_Should_Return_Paginated_Results()
+    public async Task GetContactMessagesAsync_Should_Return_Paginated_Results_In_Correct_Order()
     {
         // Arrange
         var baseTime = new DateTime(2025, 1, 1, 12, 0, 0, DateTimeKind.Utc);
@@ -291,7 +291,8 @@ public class ContactServiceTests : IDisposable
         resultList.Should().HaveCount(10);
         // The ordering should be by CreatedAt descending (most recent first)
         // User 1 has the most recent CreatedAt timestamp (baseTime.AddMinutes(-1)), so it should be first
-        resultList.First().FullName.Should().Be("User 1");
+        resultList.First().FullName.Should().Be("User 1"); // The most recent user
+        resultList.Last().FullName.Should().Be("User 10"); // The tenth most recent user
     }
 
     [Fact]
