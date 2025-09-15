@@ -212,35 +212,22 @@ try
             jwtSection.Bind(jwtOptions);
 
             // Validate JWT configuration
-            if (string.IsNullOrEmpty(jwtOptions.Issuer) ||
-                string.IsNullOrEmpty(jwtOptions.Audience) ||
-                string.IsNullOrEmpty(jwtOptions.SecurityKey))
+            var missingValues = new List<string>();
+            if (string.IsNullOrEmpty(jwtOptions.Issuer)) missingValues.Add("Issuer");
+            if (string.IsNullOrEmpty(jwtOptions.Audience)) missingValues.Add("Audience");
+            if (string.IsNullOrEmpty(jwtOptions.SecurityKey)) missingValues.Add("SecurityKey");
+
+            if (missingValues.Count > 0)
             {
-                var missingValues = new List<string>();
-                if (string.IsNullOrEmpty(jwtOptions.Issuer)) missingValues.Add("Issuer");
-                if (string.IsNullOrEmpty(jwtOptions.Audience)) missingValues.Add("Audience");
-                if (string.IsNullOrEmpty(jwtOptions.SecurityKey)) missingValues.Add("SecurityKey");
-
                 Log.Error("JWT configuration validation failed. Missing required values: {MissingValues}", string.Join(", ", missingValues));
-
-                // In production, fail fast for security
-                if (builder.Environment.IsProduction())
-                {
-                    throw new InvalidOperationException($"JWT configuration is incomplete. Missing: {string.Join(", ", missingValues)}");
-                }
-                Log.Warning("JWT configuration incomplete - authentication will not work properly");
-                return;
+                throw new InvalidOperationException($"JWT configuration is incomplete. Missing: {string.Join(", ", missingValues)}");
             }
 
             // Validate security key strength
             if (jwtOptions.SecurityKey.Length < 32)
             {
                 Log.Error("JWT SecurityKey must be at least 32 characters for security");
-                if (builder.Environment.IsProduction())
-                {
-                    throw new InvalidOperationException("JWT SecurityKey is too weak. Must be at least 32 characters.");
-                }
-                Log.Warning("JWT SecurityKey is too weak - should be at least 32 characters");
+                throw new InvalidOperationException("JWT SecurityKey is too weak. Must be at least 32 characters.");
             }
 
             builder.Services.Configure<JwtOptions>(jwtSection);
@@ -287,14 +274,8 @@ try
         }
         else
         {
-            Log.Warning("JWT configuration section '{SectionName}' not found - authentication will be disabled", JwtOptions.SectionName);
-
-            // In production environments, JWT should be mandatory
-            if (builder.Environment.IsProduction() || builder.Environment.IsStaging())
-            {
-                Log.Error("JWT configuration is mandatory in {Environment} environment", builder.Environment.EnvironmentName);
-                throw new InvalidOperationException($"JWT configuration is required in {builder.Environment.EnvironmentName} environment");
-            }
+            Log.Error("JWT configuration section '{SectionName}' not found - authentication will be disabled", JwtOptions.SectionName);
+            throw new InvalidOperationException($"JWT configuration section '{JwtOptions.SectionName}' is required for authentication in {builder.Environment.EnvironmentName} environment");
         }
     }
 
@@ -464,9 +445,9 @@ public class JwtOptions
 {
     public const string SectionName = "Jwt";
 
-    public string Issuer { get; set; } = string.Empty;
-    public string Audience { get; set; } = string.Empty;
-    public string SecurityKey { get; set; } = string.Empty;
+    public string Issuer { get; set; } = null!;
+    public string Audience { get; set; } = null!;
+    public string SecurityKey { get; set; } = null!;
 }
 
 // Make Program class accessible for integration tests
