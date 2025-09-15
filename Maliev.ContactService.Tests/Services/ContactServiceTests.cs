@@ -434,7 +434,7 @@ public class ContactServiceTests : IDisposable
             x => x.Log(
                 LogLevel.Error,
                 It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("Failed to upload file")),
+                It.Is<It.IsAnyType>(v => ContainsUploadFailureMessage(v)),
                 It.IsAny<Exception>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
@@ -920,6 +920,11 @@ public class ContactServiceTests : IDisposable
             It.Is<byte[]>(b => b.SequenceEqual(new byte[] { 1, 2, 3, 4, 5 })),
             "application/pdf",
             "test.pdf"), Times.Once);
+    }
+
+    private static bool ContainsUploadFailureMessage(object? value)
+    {
+        return value?.ToString()?.Contains("Failed to upload file") ?? false;
     }
 
     public void Dispose()
