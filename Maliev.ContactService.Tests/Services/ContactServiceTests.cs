@@ -432,9 +432,9 @@ public class ContactServiceTests : IDisposable
         // Verify that the error was logged
         _loggerMock.Verify(
             x => x.Log(
-                LogLevel.Error,
+                It.Is<LogLevel>(l => l == LogLevel.Error),
                 It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>(v => ContainsUploadFailureMessage(v)),
+                It.Is<It.IsAnyType>((v, t) => ContainsUploadFailureMessage(v)),
                 It.IsAny<Exception>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
