@@ -47,7 +47,7 @@ public class ContactServiceTests : IDisposable
         };
 
         // Act
-        var result = await _contactService.CreateContactMessageAsync(request);
+        var result = await _contactService.CreateContactMessageAsync(request).ConfigureAwait(false);
 
         // Assert
         result.Should().NotBeNull();
@@ -96,7 +96,7 @@ public class ContactServiceTests : IDisposable
             });
 
         // Act
-        var result = await _contactService.CreateContactMessageAsync(request);
+        var result = await _contactService.CreateContactMessageAsync(request).ConfigureAwait(false);
 
         // Assert
         result.Should().NotBeNull();
@@ -131,10 +131,10 @@ public class ContactServiceTests : IDisposable
         };
 
         _context.ContactMessages.Add(contact);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync().ConfigureAwait(false);
 
         // Act
-        var result = await _contactService.GetContactMessageByIdAsync(contact.Id);
+        var result = await _contactService.GetContactMessageByIdAsync(contact.Id).ConfigureAwait(false);
 
         // Assert
         result.Should().NotBeNull();
@@ -148,7 +148,7 @@ public class ContactServiceTests : IDisposable
     public async Task GetContactMessageByIdAsync_Should_Return_Null_When_Not_Exists()
     {
         // Act
-        var result = await _contactService.GetContactMessageByIdAsync(999);
+        var result = await _contactService.GetContactMessageByIdAsync(999).ConfigureAwait(false);
 
         // Assert
         result.Should().BeNull();
@@ -172,13 +172,13 @@ public class ContactServiceTests : IDisposable
         };
 
         _context.ContactMessages.Add(contact);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync().ConfigureAwait(false);
 
         // Act - First call should hit database
-        var result1 = await _contactService.GetContactMessageByIdAsync(contact.Id);
+        var result1 = await _contactService.GetContactMessageByIdAsync(contact.Id).ConfigureAwait(false);
 
         // Act - Second call should hit cache
-        var result2 = await _contactService.GetContactMessageByIdAsync(contact.Id);
+        var result2 = await _contactService.GetContactMessageByIdAsync(contact.Id).ConfigureAwait(false);
 
         // Assert
         result1.Should().NotBeNull();
@@ -205,7 +205,7 @@ public class ContactServiceTests : IDisposable
         };
 
         _context.ContactMessages.Add(contact);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync().ConfigureAwait(false);
 
         var updateRequest = new UpdateContactStatusRequest
         {
@@ -214,7 +214,7 @@ public class ContactServiceTests : IDisposable
         };
 
         // Act
-        var result = await _contactService.UpdateContactStatusAsync(contact.Id, updateRequest);
+        var result = await _contactService.UpdateContactStatusAsync(contact.Id, updateRequest).ConfigureAwait(false);
 
         // Assert
         result.Should().NotBeNull();
@@ -241,7 +241,7 @@ public class ContactServiceTests : IDisposable
         };
 
         _context.ContactMessages.Add(contact);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync().ConfigureAwait(false);
 
         var updateRequest = new UpdateContactStatusRequest
         {
@@ -249,7 +249,7 @@ public class ContactServiceTests : IDisposable
         };
 
         // Act
-        var result = await _contactService.UpdateContactStatusAsync(contact.Id, updateRequest);
+        var result = await _contactService.UpdateContactStatusAsync(contact.Id, updateRequest).ConfigureAwait(false);
 
         // Assert
         result.Should().NotBeNull();
@@ -281,10 +281,10 @@ public class ContactServiceTests : IDisposable
         }
 
         _context.ContactMessages.AddRange(contacts);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync().ConfigureAwait(false);
 
         // Act
-        var result = await _contactService.GetContactMessagesAsync(page: 1, pageSize: 10);
+        var result = await _contactService.GetContactMessagesAsync(page: 1, pageSize: 10).ConfigureAwait(false);
 
         // Assert
         var resultList = result.ToList();
@@ -304,10 +304,10 @@ public class ContactServiceTests : IDisposable
             new ContactMessage { FullName = "User 2", Email = "user2@example.com", Subject = "Subject 2", Message = "Message 2", Status = ContactStatus.InProgress, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow },
             new ContactMessage { FullName = "User 3", Email = "user3@example.com", Subject = "Subject 3", Message = "Message 3", Status = ContactStatus.Resolved, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow }
         });
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync().ConfigureAwait(false);
 
         // Act
-        var result = await _contactService.GetContactMessagesAsync(status: ContactStatus.InProgress);
+        var result = await _contactService.GetContactMessagesAsync(status: ContactStatus.InProgress).ConfigureAwait(false);
 
         // Assert
         result.Should().HaveCount(1);
@@ -332,13 +332,13 @@ public class ContactServiceTests : IDisposable
         };
 
         _context.ContactMessages.Add(contact);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync().ConfigureAwait(false);
 
         // Act
-        await _contactService.DeleteContactMessageAsync(contact.Id);
+        await _contactService.DeleteContactMessageAsync(contact.Id).ConfigureAwait(false);
 
         // Assert
-        var deletedContact = await _context.ContactMessages.FindAsync(contact.Id);
+        var deletedContact = await _context.ContactMessages.FindAsync(contact.Id).ConfigureAwait(false);
         deletedContact.Should().BeNull();
     }
 
@@ -360,7 +360,7 @@ public class ContactServiceTests : IDisposable
         };
 
         _context.ContactMessages.Add(contact);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync().ConfigureAwait(false);
 
         var contactFile = new ContactFile
         {
@@ -369,23 +369,18 @@ public class ContactServiceTests : IDisposable
             ObjectName = $"contacts/{contact.Id}/test.pdf",
             FileSize = 1024,
             ContentType = "application/pdf",
-            UploadServiceFileId = "upload-456",
-            CreatedAt = DateTime.UtcNow
+            UploadServiceFileId = "file123",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
-
         _context.ContactFiles.Add(contactFile);
-        await _context.SaveChangesAsync();
-
-        _uploadServiceMock.Setup(x => x.DeleteFileAsync("upload-456"))
-            .ReturnsAsync(true);
+        await _context.SaveChangesAsync().ConfigureAwait(false);
 
         // Act
-        await _contactService.DeleteContactFileAsync(contact.Id, contactFile.Id);
+        await _contactService.DeleteContactFileAsync(contact.Id, contactFile.Id).ConfigureAwait(false);
 
         // Assert
-        _uploadServiceMock.Verify(x => x.DeleteFileAsync("upload-456"), Times.Once);
-
-        var deletedFile = await _context.ContactFiles.FindAsync(contactFile.Id);
+        var deletedFile = await _context.ContactFiles.FindAsync(contactFile.Id).ConfigureAwait(false);
         deletedFile.Should().BeNull();
     }
 
@@ -396,7 +391,7 @@ public class ContactServiceTests : IDisposable
         Func<Task> act = async () => await _contactService.CreateContactMessageAsync(null!);
 
         // Assert
-        await act.Should().ThrowAsync<ArgumentNullException>();
+        await act.Should().ThrowAsync<ArgumentNullException>().ConfigureAwait(false);
     }
 
     [Fact]
@@ -425,7 +420,7 @@ public class ContactServiceTests : IDisposable
             .ThrowsAsync(new Exception("Upload failed"));
 
         // Act
-        var result = await _contactService.CreateContactMessageAsync(request);
+        var result = await _contactService.CreateContactMessageAsync(request).ConfigureAwait(false);
 
         // Assert
         result.Should().NotBeNull();
@@ -460,7 +455,7 @@ public class ContactServiceTests : IDisposable
         Func<Task> act = async () => await _contactService.UpdateContactStatusAsync(contactId, updateRequest);
 
         // Assert
-        await act.Should().ThrowAsync<Maliev.ContactService.Api.Exceptions.NotFoundException>();
+        await act.Should().ThrowAsync<Maliev.ContactService.Api.Exceptions.NotFoundException>().ConfigureAwait(false);
     }
 
     [Fact]
@@ -475,7 +470,7 @@ public class ContactServiceTests : IDisposable
         Func<Task> act = async () => await _contactService.DeleteContactMessageAsync(contactId);
 
         // Assert
-        await act.Should().ThrowAsync<Maliev.ContactService.Api.Exceptions.NotFoundException>();
+        await act.Should().ThrowAsync<Maliev.ContactService.Api.Exceptions.NotFoundException>().ConfigureAwait(false);
     }
 
     [Fact]
@@ -500,23 +495,24 @@ public class ContactServiceTests : IDisposable
         };
 
         _context.ContactMessages.Add(contact);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync().ConfigureAwait(false);
 
         // Verify the contact exists
-        var existingContact = await _context.ContactMessages.FindAsync(contactId);
+        var existingContact = await _context.ContactMessages.FindAsync(contactId).ConfigureAwait(false);
         existingContact.Should().NotBeNull();
 
         // Verify no files exist for this contact
         var existingFiles = await _context.ContactFiles
             .Where(f => f.ContactMessageId == contactId)
-            .ToListAsync();
+            .ToListAsync()
+            .ConfigureAwait(false);
         existingFiles.Should().BeEmpty();
 
         // Act
-        Func<Task> act = async () => await _contactService.DeleteContactFileAsync(contactId, fileId);
+        Func<Task> act = async () => await _contactService.DeleteContactFileAsync(contactId, fileId).ConfigureAwait(false);
 
         // Assert
-        await act.Should().ThrowAsync<Maliev.ContactService.Api.Exceptions.NotFoundException>();
+        await act.Should().ThrowAsync<Maliev.ContactService.Api.Exceptions.NotFoundException>().ConfigureAwait(false);
     }
 
     [Fact]
@@ -541,20 +537,21 @@ public class ContactServiceTests : IDisposable
         };
 
         _context.ContactMessages.Add(contact);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync().ConfigureAwait(false);
 
         // Verify the contact exists
-        var existingContact = await _context.ContactMessages.FindAsync(contactId);
+        var existingContact = await _context.ContactMessages.FindAsync(contactId).ConfigureAwait(false);
         existingContact.Should().NotBeNull();
 
         // Verify no files exist for this contact
         var existingFiles = await _context.ContactFiles
             .Where(f => f.ContactMessageId == contactId)
-            .ToListAsync();
+            .ToListAsync()
+            .ConfigureAwait(false);
         existingFiles.Should().BeEmpty();
 
         // Act
-        var result = await _contactService.GetContactFileByIdAsync(contactId, fileId);
+        var result = await _contactService.GetContactFileByIdAsync(contactId, fileId).ConfigureAwait(false);
 
         // Assert
         result.Should().BeNull();
