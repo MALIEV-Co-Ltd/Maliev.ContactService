@@ -9,7 +9,15 @@ public class ContactDbContextDesignTimeFactory : IDesignTimeDbContextFactory<Con
     public ContactDbContext CreateDbContext(string[] args)
     {
         var optionsBuilder = new DbContextOptionsBuilder<ContactDbContext>();
-        optionsBuilder.UseNpgsql("Server=localhost;Port=5432;Database=contact_app_db;User Id=postgres;Password=password;");
+
+        var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__ContactDbContext");
+
+        if (string.IsNullOrEmpty(connectionString))
+        {
+            connectionString = "Host=localhost;Port=5433;Database=contact_app_db;Username=postgres;Password=temp;SslMode=Disable";
+        }
+
+        optionsBuilder.UseNpgsql(connectionString);
 
         return new ContactDbContext(optionsBuilder.Options);
     }
