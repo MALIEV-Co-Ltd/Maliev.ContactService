@@ -20,7 +20,7 @@ namespace Maliev.ContactService.Tests.Integration;
 
 /// <summary>
 /// Local integration tests for T054-T057 that run without external dependencies.
-/// These tests use Testcontainers PostgreSQL and mock services.
+/// These tests use Testcontainers PostgreSQL 18 and mock services.
 /// </summary>
 [Trait("Category", "Integration")]
 [Trait("Purpose", "LocalTesting")]
@@ -460,7 +460,7 @@ public class LocalTestWebApplicationFactory : WebApplicationFactory<Program>, IA
         // Create and start a PostgreSQL container synchronously
         // This is necessary because WebApplicationFactory requires synchronous initialization
         _postgresContainer = new PostgreSqlBuilder()
-            .WithImage("postgres:17.5")
+            .WithImage("postgres:18")
             .WithDatabase("contact_test_db")
             .WithUsername("postgres")
             .WithPassword("test_password")
