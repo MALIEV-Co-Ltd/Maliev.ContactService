@@ -34,16 +34,10 @@ public class ContactsController : ControllerBase
     [EnableRateLimiting("ContactPolicy")]
     public async Task<ActionResult<ContactMessageDto>> CreateContactMessage(CreateContactMessageRequest request)
     {
-        try
-        {
-            var contact = await _contactService.CreateContactMessageAsync(request);
-            return CreatedAtAction(nameof(GetContactMessage), new { id = contact.Id }, contact);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating contact message from {Email}", request?.Email ?? "unknown");
-            return StatusCode(500, new { message = "An error occurred while processing your request" });
-        }
+        // Let ExceptionHandlingMiddleware handle exceptions for proper status codes
+        // (409 for DuplicateInquiryException, 503 for CountryServiceException, etc.)
+        var contact = await _contactService.CreateContactMessageAsync(request);
+        return CreatedAtAction(nameof(GetContactMessage), new { id = contact.Id }, contact);
     }
 
     /// <summary>
@@ -52,6 +46,7 @@ public class ContactsController : ControllerBase
     /// <param name="pagination">Pagination parameters</param>
     /// <param name="status">Filter by status</param>
     /// <param name="contactType">Filter by contact type</param>
+    /// <param name="email">Filter by email address</param>
     /// <returns>List of contact messages</returns>
     [HttpGet]
     [Authorize(Policy = "AdminOnly")]
@@ -59,17 +54,29 @@ public class ContactsController : ControllerBase
     public async Task<ActionResult<IEnumerable<ContactMessageDto>>> GetContactMessages(
         [FromQuery] PaginationParameters pagination,
         [FromQuery] ContactStatus? status = null,
-        [FromQuery] ContactType? contactType = null)
+        [FromQuery] ContactType? contactType = null,
+        [FromQuery] string? email = null)
     {
         try
         {
-            var contacts = await _contactService.GetContactMessagesAsync(pagination.Page, pagination.PageSize, status, contactType);
+            // T044: Validate pagination parameters
+            if (pagination.PageSize < 1 || pagination.PageSize > 100)
+            {
+                return BadRequest(new { message = "PageSize must be between 1 and 100" });
+            }
+
+            if (pagination.Page < 1)
+            {
+                return BadRequest(new { message = "Page must be greater than or equal to 1" });
+            }
+
+            var contacts = await _contactService.GetContactMessagesAsync(pagination.Page, pagination.PageSize, status, contactType, email);
             return Ok(contacts);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting contact messages with pagination Page={Page}, PageSize={PageSize}, Status={Status}, ContactType={ContactType}", 
-                pagination.Page, pagination.PageSize, status, contactType);
+            _logger.LogError(ex, "Error getting contact messages with pagination Page={Page}, PageSize={PageSize}, Status={Status}, ContactType={ContactType}, Email={Email}",
+                pagination.Page, pagination.PageSize, status, contactType, email);
             return StatusCode(500, new { message = "An error occurred while processing your request" });
         }
     }

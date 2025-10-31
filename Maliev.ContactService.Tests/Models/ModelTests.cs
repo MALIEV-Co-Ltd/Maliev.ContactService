@@ -92,7 +92,6 @@ public class ModelTests
     [Theory]
     [InlineData(ContactType.General)]
     [InlineData(ContactType.Business)]
-    [InlineData(ContactType.Quotation)]
     [InlineData(ContactType.Supplier)]
     public void ContactType_Enum_Should_Have_Valid_Values(ContactType contactType)
     {

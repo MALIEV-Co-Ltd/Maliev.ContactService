@@ -33,14 +33,24 @@ public class ExceptionHandlingMiddleware
         var response = context.Response;
         response.ContentType = "application/json";
 
+        // Unwrap AggregateException to get the actual inner exception
+        // This is necessary because Task.FromException wraps exceptions in AggregateException
+        var actualException = exception;
+        if (exception is AggregateException aggregateException && aggregateException.InnerExceptions.Count == 1)
+        {
+            actualException = aggregateException.InnerException ?? exception;
+        }
+
         var errorResponse = new
         {
             message = "An error occurred while processing your request",
             traceId = context.TraceIdentifier
         };
 
-        response.StatusCode = exception switch
+        response.StatusCode = actualException switch
         {
+            DuplicateInquiryException => (int)HttpStatusCode.Conflict,
+            CountryServiceException => (int)HttpStatusCode.ServiceUnavailable,
             ArgumentException => (int)HttpStatusCode.BadRequest,
             UnauthorizedAccessException => (int)HttpStatusCode.Unauthorized,
             KeyNotFoundException => (int)HttpStatusCode.NotFound,
@@ -48,12 +58,21 @@ public class ExceptionHandlingMiddleware
             _ => (int)HttpStatusCode.InternalServerError
         };
 
-        // For NotFoundException, provide a more specific message
-        if (exception is NotFoundException)
+        // Provide specific messages for known exceptions (FR-015: user-friendly errors)
+        if (actualException is DuplicateInquiryException || actualException is CountryServiceException || actualException is NotFoundException)
         {
             errorResponse = new
             {
-                message = exception.Message,
+                message = actualException.Message,
+                traceId = context.TraceIdentifier
+            };
+        }
+        else if (actualException is ArgumentException argEx)
+        {
+            // Provide validation message but sanitize to avoid exposing internals
+            errorResponse = new
+            {
+                message = argEx.Message,
                 traceId = context.TraceIdentifier
             };
         }

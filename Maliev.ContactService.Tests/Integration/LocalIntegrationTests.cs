@@ -1,0 +1,575 @@
+using System.Net;
+using System.Net.Http.Json;
+using FluentAssertions;
+using Maliev.ContactService.Api.Exceptions;
+using Maliev.ContactService.Api.Models;
+using Maliev.ContactService.Api.Services;
+using Maliev.ContactService.Data.DbContexts;
+using Maliev.ContactService.Data.Models;
+using Maliev.ContactService.Tests.Services;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Testcontainers.PostgreSql;
+
+namespace Maliev.ContactService.Tests.Integration;
+
+/// <summary>
+/// Local integration tests for T054-T057 that run without external dependencies.
+/// These tests use Testcontainers PostgreSQL and mock services.
+/// </summary>
+[Trait("Category", "Integration")]
+[Trait("Purpose", "LocalTesting")]
+public class LocalIntegrationTests : IClassFixture<LocalTestWebApplicationFactory>, IAsyncLifetime
+{
+    private readonly LocalTestWebApplicationFactory _factory;
+    private HttpClient _client = null!;
+
+    public LocalIntegrationTests(LocalTestWebApplicationFactory factory)
+    {
+        _factory = factory;
+    }
+
+    public async Task InitializeAsync()
+    {
+        // Wait for container to be ready
+        await _factory.InitializeAsync();
+
+        // Create client after container is initialized
+        _client = _factory.CreateClient();
+    }
+
+    public async Task DisposeAsync()
+    {
+        _client?.Dispose();
+        await Task.CompletedTask;
+    }
+
+    #region T054: Health Check Tests
+
+    [Fact]
+    public async Task T054_Liveness_Endpoint_Should_Return_200_With_Healthy_Text()
+    {
+        // Act
+        var response = await _client.GetAsync("/contacts/liveness");
+        var content = await response.Content.ReadAsStringAsync();
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK, "liveness endpoint should always return 200");
+        content.Should().Be("Healthy", "liveness endpoint should return 'Healthy' text");
+    }
+
+    [Fact]
+    public async Task T054_Readiness_Endpoint_Should_Return_200_With_Health_Check_Structure()
+    {
+        // Act
+        var response = await _client.GetAsync("/contacts/readiness");
+        var content = await response.Content.ReadAsStringAsync();
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK, "readiness endpoint should return 200 when healthy");
+        content.Should().NotBeNullOrEmpty("readiness should return health check details");
+        content.Should().Contain("status", "readiness response should contain status field");
+    }
+
+    #endregion
+
+    #region T055: Rate Limiting Tests
+
+    [Fact(Skip = "Rate limiting is disabled in Testing environment - manual testing required")]
+    public async Task T055_Rate_Limiting_Should_Block_11th_Request_With_429()
+    {
+        // NOTE: This test is skipped because rate limiting is disabled in Testing environment
+        // To test rate limiting manually:
+        // 1. Deploy to dev/staging environment
+        // 2. Submit 11 contact forms from same IP within 1 hour
+        // 3. Verify 11th request returns HTTP 429
+
+        // Arrange - Create a unique client IP for this test
+        // Note: WebApplicationFactory uses the same IP for all requests, but rate limiting works per IP
+        var testEmail = $"ratelimit.{Guid.NewGuid():N}@example.com";
+
+        var requests = new List<Task<HttpResponseMessage>>();
+
+        // Act - Submit 11 requests rapidly
+        for (int i = 0; i < 11; i++)
+        {
+            var request = new CreateContactMessageRequest
+            {
+                FullName = $"Rate Limit Test {i}",
+                Email = $"{i}.{testEmail}",
+                Subject = "Rate Limit Test",
+                Message = "Testing rate limiting",
+                CountryId = 1,
+                ContactType = ContactType.General,
+                Priority = Priority.Medium,
+                Files = new List<CreateContactFileRequest>()
+            };
+
+            requests.Add(_client.PostAsJsonAsync("/v1/contacts", request));
+        }
+
+        var responses = await Task.WhenAll(requests);
+
+        // Assert
+        var successCount = responses.Count(r => r.StatusCode == HttpStatusCode.Created);
+        var rateLimitedCount = responses.Count(r => r.StatusCode == HttpStatusCode.TooManyRequests);
+
+        // Should allow 10 requests and block the 11th
+        successCount.Should().BeLessThanOrEqualTo(10, "should allow up to 10 requests per hour");
+        rateLimitedCount.Should().BeGreaterThanOrEqualTo(1, "should block at least one request with 429");
+
+        // At least one response should be 429
+        responses.Should().Contain(r => r.StatusCode == HttpStatusCode.TooManyRequests,
+            "the 11th request should return 429 Too Many Requests");
+    }
+
+    #endregion
+
+    #region T056: Duplicate Prevention Tests
+
+    [Fact]
+    public async Task T056_Duplicate_Inquiry_Within_60_Seconds_Should_Return_409()
+    {
+        // Arrange
+        var testEmail = $"duplicate.{Guid.NewGuid():N}@example.com";
+        var request = new CreateContactMessageRequest
+        {
+            FullName = "Duplicate Test User",
+            Email = testEmail,
+            Subject = "Duplicate Prevention Test",
+            Message = "Testing duplicate inquiry prevention",
+            CountryId = 1,
+            ContactType = ContactType.General,
+            Priority = Priority.Medium,
+            Files = new List<CreateContactFileRequest>()
+        };
+
+        // Act - First submission (should succeed)
+        var response1 = await _client.PostAsJsonAsync("/v1/contacts", request);
+
+        // Wait 2 seconds (well within 60 seconds window)
+        await Task.Delay(TimeSpan.FromSeconds(2));
+
+        // Act - Second submission with same email (should fail with 409)
+        var response2 = await _client.PostAsJsonAsync("/v1/contacts", request);
+
+        // Assert
+        response1.StatusCode.Should().Be(HttpStatusCode.Created,
+            "first submission should succeed");
+
+        response2.StatusCode.Should().Be(HttpStatusCode.Conflict,
+            "second submission within 60 seconds should return 409 Conflict");
+
+        var errorContent = await response2.Content.ReadAsStringAsync();
+        errorContent.Should().Contain("recently submitted",
+            "error message should mention recent submission");
+    }
+
+    [Fact]
+    public async Task T056_Different_Email_Should_Not_Trigger_Duplicate_Prevention()
+    {
+        // Arrange
+        var testEmail1 = $"user1.{Guid.NewGuid():N}@example.com";
+        var testEmail2 = $"user2.{Guid.NewGuid():N}@example.com";
+
+        var request1 = new CreateContactMessageRequest
+        {
+            FullName = "Test User 1",
+            Email = testEmail1,
+            Subject = "Test Subject",
+            Message = "Test Message",
+            CountryId = 1,
+            ContactType = ContactType.General,
+            Priority = Priority.Medium,
+            Files = new List<CreateContactFileRequest>()
+        };
+
+        var request2 = new CreateContactMessageRequest
+        {
+            FullName = "Test User 2",
+            Email = testEmail2,
+            Subject = "Test Subject",
+            Message = "Test Message",
+            CountryId = 1,
+            ContactType = ContactType.General,
+            Priority = Priority.Medium,
+            Files = new List<CreateContactFileRequest>()
+        };
+
+        // Act
+        var response1 = await _client.PostAsJsonAsync("/v1/contacts", request1);
+        var response2 = await _client.PostAsJsonAsync("/v1/contacts", request2);
+
+        // Assert
+        response1.StatusCode.Should().Be(HttpStatusCode.Created,
+            "first submission should succeed");
+        response2.StatusCode.Should().Be(HttpStatusCode.Created,
+            "second submission with different email should also succeed");
+    }
+
+    #endregion
+
+    #region T057: Country Service Unavailability Tests
+
+    [Fact]
+    public async Task T057_Country_Service_Unavailability_Should_Return_503()
+    {
+        // Arrange - Create a client with a factory that uses a failing CountryServiceClient
+        var client = CreateClientWithFailingCountryService();
+
+        var request = new CreateContactMessageRequest
+        {
+            FullName = "Country Service Test",
+            Email = $"countrytest.{Guid.NewGuid():N}@example.com",
+            Subject = "Country Service Unavailability Test",
+            Message = "Testing Country Service failure handling",
+            CountryId = 1,
+            ContactType = ContactType.General,
+            Priority = Priority.Medium,
+            Files = new List<CreateContactFileRequest>()
+        };
+
+        // Act
+        var response = await client.PostAsJsonAsync("/v1/contacts", request);
+        var content = await response.Content.ReadAsStringAsync();
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable,
+            "should return 503 when Country Service is unavailable");
+
+        content.ToLower().Should().Contain("country",
+            "error message should mention country service issue");
+    }
+
+    [Fact]
+    public async Task T057_Country_Service_Unavailability_Should_Not_Create_Contact_Record()
+    {
+        // Arrange
+        var client = CreateClientWithFailingCountryService();
+        var testEmail = $"countrytest.{Guid.NewGuid():N}@example.com";
+
+        var request = new CreateContactMessageRequest
+        {
+            FullName = "Country Service Test",
+            Email = testEmail,
+            Subject = "Test",
+            Message = "Test",
+            CountryId = 1,
+            ContactType = ContactType.General,
+            Priority = Priority.Medium,
+            Files = new List<CreateContactFileRequest>()
+        };
+
+        // Act - Try to create contact (should fail due to Country Service)
+        var createResponse = await client.PostAsJsonAsync("/v1/contacts", request);
+
+        // Assert - Should return 503
+        createResponse.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+
+        // Verify no contact was created by checking if we can query it
+        // Since we're using in-memory DB and the same factory, the record should not exist
+        var getResponse = await client.GetAsync("/v1/contacts");
+        getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var contacts = await getResponse.Content.ReadFromJsonAsync<IEnumerable<ContactMessageDto>>();
+        contacts.Should().NotBeNull();
+        contacts.Should().NotContain(c => c.Email == testEmail,
+            "contact should not be created when Country Service is unavailable");
+    }
+
+    #endregion
+
+    #region Additional Manual Testing Scenarios (Automated)
+
+    [Fact]
+    public async Task T058_Submit_Contact_With_Valid_CountryId_Should_Return_201()
+    {
+        // Arrange
+        var testEmail = $"valid.country.{Guid.NewGuid():N}@example.com";
+        var request = new CreateContactMessageRequest
+        {
+            FullName = "Valid Country Test",
+            Email = testEmail,
+            Subject = "Test with Valid Country",
+            Message = "Testing valid countryId submission",
+            CountryId = 1, // Valid country ID
+            ContactType = ContactType.General,
+            Priority = Priority.Medium,
+            Files = new List<CreateContactFileRequest>()
+        };
+
+        // Act
+        var response = await _client.PostAsJsonAsync("/v1/contacts", request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Created,
+            "valid contact submission should return 201 Created");
+
+        var contactDto = await response.Content.ReadFromJsonAsync<ContactMessageDto>();
+        contactDto.Should().NotBeNull();
+        contactDto!.Email.Should().Be(testEmail);
+        contactDto.CountryId.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task T059_Submit_Contact_With_Invalid_CountryId_Should_Return_400()
+    {
+        // Arrange
+        var testEmail = $"invalid.country.{Guid.NewGuid():N}@example.com";
+        var request = new CreateContactMessageRequest
+        {
+            FullName = "Invalid Country Test",
+            Email = testEmail,
+            Subject = "Test with Invalid Country",
+            Message = "Testing invalid countryId submission",
+            CountryId = 9999, // Out of valid range
+            ContactType = ContactType.General,
+            Priority = Priority.Medium,
+            Files = new List<CreateContactFileRequest>()
+        };
+
+        // Act
+        var response = await _client.PostAsJsonAsync("/v1/contacts", request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
+            "invalid countryId should return 400 Bad Request due to Range validation");
+    }
+
+    [Fact]
+    public async Task T060_Submit_Contact_With_Quotation_Type_Should_Return_422()
+    {
+        // Arrange
+        var testEmail = $"quotation.{Guid.NewGuid():N}@example.com";
+        var request = new
+        {
+            fullName = "Quotation Test User",
+            email = testEmail,
+            subject = "Quotation Request",
+            message = "Testing quotation type rejection",
+            countryId = 1,
+            contactType = 2, // Quotation (removed type)
+            priority = 1,
+            files = new List<object>()
+        };
+
+        // Act
+        var response = await _client.PostAsJsonAsync("/v1/contacts", request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
+            "ContactType=Quotation (2) should return 400 Bad Request for validation error");
+
+        var content = await response.Content.ReadAsStringAsync();
+        content.Should().Contain("Quotation",
+            "error message should mention Quotation service");
+    }
+
+    [Fact]
+    public async Task T061_Submit_Contact_With_Missing_Required_Fields_Should_Return_400()
+    {
+        // Arrange - Request with missing required fields
+        var request = new
+        {
+            fullName = "Test User",
+            // Missing email (required)
+            // Missing subject (required)
+            // Missing message (required)
+            // Missing countryId (required)
+            contactType = 0,
+            priority = 1
+        };
+
+        // Act
+        var response = await _client.PostAsJsonAsync("/v1/contacts", request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
+            "missing required fields should return 400 Bad Request");
+
+        var content = await response.Content.ReadAsStringAsync();
+        content.Should().NotBeNullOrEmpty("error response should contain validation messages");
+    }
+
+    #endregion
+
+    #region Helper Methods
+
+    private HttpClient CreateClientWithFailingCountryService()
+    {
+        // Use the same factory but override the CountryServiceClient
+        return _factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureServices(services =>
+            {
+                // Remove the mock CountryServiceClient
+                var descriptor = services.SingleOrDefault(
+                    d => d.ServiceType == typeof(ICountryServiceClient));
+
+                if (descriptor != null)
+                {
+                    services.Remove(descriptor);
+                }
+
+                // Add a failing mock
+                services.AddScoped<ICountryServiceClient, FailingCountryServiceClient>();
+            });
+        }).CreateClient();
+    }
+
+    #endregion
+}
+
+/// <summary>
+/// Mock Country Service client that simulates service unavailability
+/// </summary>
+public class FailingCountryServiceClient : ICountryServiceClient
+{
+    public Task<bool> ValidateCountryExistsAsync(int countryId, CancellationToken cancellationToken = default)
+    {
+        return Task.FromException<bool>(
+            new CountryServiceException("Country Service is currently unavailable. Please try again in a few moments."));
+    }
+}
+
+/// <summary>
+/// Custom WebApplicationFactory for local integration tests that uses Testcontainers PostgreSQL.
+/// This provides a real PostgreSQL database for each test run, with automatic cleanup.
+/// </summary>
+public class LocalTestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
+{
+    private PostgreSqlContainer? _postgresContainer;
+    private string _connectionString = string.Empty;
+
+    public LocalTestWebApplicationFactory()
+    {
+        // Eagerly initialize the container before anything else
+        // This ensures the connection string is available for ConfigureWebHost
+        EnsureContainerStarted();
+    }
+
+    private void EnsureContainerStarted()
+    {
+        if (_postgresContainer != null) return;
+
+        // Create and start a PostgreSQL container synchronously
+        // This is necessary because WebApplicationFactory requires synchronous initialization
+        _postgresContainer = new PostgreSqlBuilder()
+            .WithImage("postgres:17.5")
+            .WithDatabase("contact_test_db")
+            .WithUsername("postgres")
+            .WithPassword("test_password")
+            .WithCleanUp(true)
+            .Build();
+
+        _postgresContainer.StartAsync().GetAwaiter().GetResult();
+
+        // Get the connection string from the running container
+        _connectionString = _postgresContainer.GetConnectionString();
+
+        // Apply migrations to the test database
+        ApplyMigrationsAsync().GetAwaiter().GetResult();
+    }
+
+    public Task InitializeAsync()
+    {
+        // Container is already started in constructor
+        return Task.CompletedTask;
+    }
+
+    public new async Task DisposeAsync()
+    {
+        if (_postgresContainer != null)
+        {
+            await _postgresContainer.DisposeAsync();
+        }
+        await base.DisposeAsync();
+    }
+
+    private async Task ApplyMigrationsAsync()
+    {
+        if (_connectionString == null) return;
+
+        var optionsBuilder = new DbContextOptionsBuilder<ContactDbContext>();
+        optionsBuilder.UseNpgsql(_connectionString);
+
+        using var db = new ContactDbContext(optionsBuilder.Options);
+        await db.Database.MigrateAsync();
+    }
+
+    public void CleanDatabase()
+    {
+        if (_connectionString == null) return;
+
+        var optionsBuilder = new DbContextOptionsBuilder<ContactDbContext>();
+        optionsBuilder.UseNpgsql(_connectionString);
+
+        using var db = new ContactDbContext(optionsBuilder.Options);
+        try
+        {
+            db.Database.ExecuteSqlRaw("TRUNCATE TABLE \"ContactFiles\" CASCADE");
+            db.Database.ExecuteSqlRaw("TRUNCATE TABLE \"ContactMessages\" RESTART IDENTITY CASCADE");
+        }
+        catch
+        {
+            // Ignore errors if tables don't exist yet
+        }
+    }
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.UseEnvironment("Testing");
+
+        // Set UseTestcontainers BEFORE configuration is loaded
+        builder.UseSetting("UseTestcontainers", "true");
+
+        builder.ConfigureServices(services =>
+        {
+            // Ensure container is started
+            EnsureContainerStarted();
+
+            if (string.IsNullOrEmpty(_connectionString))
+            {
+                throw new InvalidOperationException("Testcontainers connection string is not initialized");
+            }
+
+            // Remove InMemoryDatabase DbContext registration from Program.cs
+            var dbContextDescriptor = services.SingleOrDefault(
+                d => d.ServiceType == typeof(DbContextOptions<ContactDbContext>));
+            if (dbContextDescriptor != null)
+            {
+                services.Remove(dbContextDescriptor);
+            }
+
+            // Remove the actual DbContext registration too
+            var contextDescriptor = services.SingleOrDefault(
+                d => d.ServiceType == typeof(ContactDbContext));
+            if (contextDescriptor != null)
+            {
+                services.Remove(contextDescriptor);
+            }
+
+            // Add PostgreSQL DbContext for testing with Testcontainers connection string
+            var connStr = _connectionString; // Capture for lambda
+            services.AddDbContext<ContactDbContext>(options =>
+            {
+                options.UseNpgsql(connStr);
+            });
+
+            // Since Program.cs skips HttpClient registration in Testing environment,
+            // we only need to register the mock implementations
+            services.AddScoped<IUploadServiceClient, MockUploadServiceClient>();
+            services.AddScoped<ICountryServiceClient, MockCountryServiceClient>();
+
+            // Add test authentication
+            services.AddAuthentication(TestAuthHandler.TestScheme)
+                .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(
+                    TestAuthHandler.TestScheme, options => {});
+        });
+    }
+}

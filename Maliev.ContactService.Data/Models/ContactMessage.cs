@@ -31,6 +31,9 @@ public class ContactMessage : IAuditable
     public required string Message { get; set; }
 
     [Required]
+    public int CountryId { get; set; }
+
+    [Required]
     public ContactType ContactType { get; set; } = ContactType.General;
 
     [Required]
@@ -47,6 +50,9 @@ public class ContactMessage : IAuditable
 
     public DateTimeOffset? ResolvedAt { get; set; }
 
+    [Timestamp]
+    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
+
     // Navigation property
     public virtual ICollection<ContactFile> Files { get; set; } = new List<ContactFile>();
 }
@@ -55,7 +61,6 @@ public enum ContactType
 {
     General = 0,
     Supplier = 1,
-    Quotation = 2,
     Business = 3
 }
 

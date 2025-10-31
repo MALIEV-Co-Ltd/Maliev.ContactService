@@ -11,7 +11,8 @@ public interface IContactService
         int page = 1,
         int pageSize = 20,
         ContactStatus? status = null,
-        ContactType? contactType = null);
+        ContactType? contactType = null,
+        string? email = null);
     Task<ContactMessageDto> UpdateContactStatusAsync(int id, UpdateContactStatusRequest request);
     Task DeleteContactMessageAsync(int id);
     Task<IEnumerable<ContactFileDto>> GetContactFilesAsync(int contactId);

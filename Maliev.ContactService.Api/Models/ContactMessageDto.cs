@@ -11,6 +11,7 @@ public class ContactMessageDto
     public string? Company { get; set; }
     public required string Subject { get; set; }
     public required string Message { get; set; }
+    public int CountryId { get; set; }
     public ContactType ContactType { get; set; }
     public Priority Priority { get; set; }
     public ContactStatus Status { get; set; }

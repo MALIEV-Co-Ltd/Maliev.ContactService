@@ -15,6 +15,7 @@ public class ContactServiceTests : IDisposable
     private readonly ContactDbContext _context;
     private readonly IMemoryCache _cache;
     private readonly Mock<IUploadServiceClient> _uploadServiceMock;
+    private readonly Mock<ICountryServiceClient> _countryServiceMock;
     private readonly Mock<ILogger<Api.Services.ContactService>> _loggerMock;
     private readonly Api.Services.ContactService _contactService;
 
@@ -27,9 +28,14 @@ public class ContactServiceTests : IDisposable
         _context = new ContactDbContext(options);
         _cache = new MemoryCache(new MemoryCacheOptions());
         _uploadServiceMock = new Mock<IUploadServiceClient>();
+        _countryServiceMock = new Mock<ICountryServiceClient>();
         _loggerMock = new Mock<ILogger<Api.Services.ContactService>>();
 
-        _contactService = new Api.Services.ContactService(_context, _cache, _uploadServiceMock.Object, _loggerMock.Object);
+        // Setup default behavior for country service mock
+        _countryServiceMock.Setup(x => x.ValidateCountryExistsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        _contactService = new Api.Services.ContactService(_context, _cache, _uploadServiceMock.Object, _countryServiceMock.Object, _loggerMock.Object);
     }
 
     [Fact]
@@ -42,6 +48,7 @@ public class ContactServiceTests : IDisposable
             Email = "john.doe@example.com",
             Subject = "Test Inquiry",
             Message = "This is a test message",
+            CountryId = 1,
             ContactType = ContactType.General,
             Priority = Priority.High
         };
@@ -73,7 +80,8 @@ public class ContactServiceTests : IDisposable
             Email = "jane.doe@example.com",
             Subject = "Quotation Request",
             Message = "Please provide a quote",
-            ContactType = ContactType.Quotation,
+            CountryId = 1,
+            ContactType = ContactType.General,
             Files = new List<CreateContactFileRequest>
             {
                 new CreateContactFileRequest
@@ -123,6 +131,7 @@ public class ContactServiceTests : IDisposable
             Email = "test@example.com",
             Subject = "Test Subject",
             Message = "Test Message",
+            CountryId = 1,
             ContactType = ContactType.Business,
             Priority = Priority.Medium,
             Status = ContactStatus.New,
@@ -164,6 +173,7 @@ public class ContactServiceTests : IDisposable
             Email = "cached@example.com",
             Subject = "Cached Subject",
             Message = "Cached Message",
+            CountryId = 1,
             ContactType = ContactType.General,
             Priority = Priority.Low,
             Status = ContactStatus.New,
@@ -197,6 +207,7 @@ public class ContactServiceTests : IDisposable
             Email = "update@example.com",
             Subject = "Update Subject",
             Message = "Update Message",
+            CountryId = 1,
             ContactType = ContactType.General,
             Priority = Priority.Medium,
             Status = ContactStatus.New,
@@ -233,6 +244,7 @@ public class ContactServiceTests : IDisposable
             Email = "resolve@example.com",
             Subject = "Resolve Subject",
             Message = "Resolve Message",
+            CountryId = 1,
             ContactType = ContactType.General,
             Priority = Priority.Medium,
             Status = ContactStatus.InProgress,
@@ -272,6 +284,7 @@ public class ContactServiceTests : IDisposable
                 Email = $"user{i}@example.com",
                 Subject = $"Subject {i}",
                 Message = $"Message {i}",
+                CountryId = 1,
                 ContactType = i % 2 == 0 ? ContactType.General : ContactType.Business,
                 Priority = Priority.Medium,
                 Status = ContactStatus.New,
@@ -301,9 +314,9 @@ public class ContactServiceTests : IDisposable
         // Arrange
         _context.ContactMessages.AddRange(new[]
         {
-            new ContactMessage { FullName = "User 1", Email = "user1@example.com", Subject = "Subject 1", Message = "Message 1", Status = ContactStatus.New, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow },
-            new ContactMessage { FullName = "User 2", Email = "user2@example.com", Subject = "Subject 2", Message = "Message 2", Status = ContactStatus.InProgress, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow },
-            new ContactMessage { FullName = "User 3", Email = "user3@example.com", Subject = "Subject 3", Message = "Message 3", Status = ContactStatus.Resolved, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow }
+            new ContactMessage { FullName = "User 1", Email = "user1@example.com", Subject = "Subject 1", Message = "Message 1", CountryId = 1, Status = ContactStatus.New, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow },
+            new ContactMessage { FullName = "User 2", Email = "user2@example.com", Subject = "Subject 2", Message = "Message 2", CountryId = 1, Status = ContactStatus.InProgress, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow },
+            new ContactMessage { FullName = "User 3", Email = "user3@example.com", Subject = "Subject 3", Message = "Message 3", CountryId = 1, Status = ContactStatus.Resolved, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow }
         });
         await _context.SaveChangesAsync();
 
@@ -325,6 +338,7 @@ public class ContactServiceTests : IDisposable
             Email = "delete@example.com",
             Subject = "Delete Subject",
             Message = "Delete Message",
+            CountryId = 1,
             ContactType = ContactType.General,
             Priority = Priority.Medium,
             Status = ContactStatus.New,
@@ -353,6 +367,7 @@ public class ContactServiceTests : IDisposable
             Email = "filedelete@example.com",
             Subject = "File Delete Subject",
             Message = "File Delete Message",
+            CountryId = 1,
             ContactType = ContactType.General,
             Priority = Priority.Medium,
             Status = ContactStatus.New,
@@ -642,6 +657,7 @@ public class ContactServiceTests : IDisposable
             Email = "filedelete@example.com",
             Subject = "File Delete Subject",
             Message = "File Delete Message",
+            CountryId = 1,
             ContactType = ContactType.General,
             Priority = Priority.Medium,
             Status = ContactStatus.New,

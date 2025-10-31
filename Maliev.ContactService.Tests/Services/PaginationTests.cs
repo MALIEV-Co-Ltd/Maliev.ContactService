@@ -19,6 +19,7 @@ public class PaginationTests : IDisposable
     private readonly ContactDbContext _context;
     private readonly IMemoryCache _cache;
     private readonly Mock<IUploadServiceClient> _uploadServiceMock;
+    private readonly Mock<ICountryServiceClient> _countryServiceMock;
     private readonly Mock<ILogger<Api.Services.ContactService>> _loggerMock;
     private readonly Api.Services.ContactService _contactService;
 
@@ -31,9 +32,13 @@ public class PaginationTests : IDisposable
         _context = new ContactDbContext(options);
         _cache = new MemoryCache(new MemoryCacheOptions());
         _uploadServiceMock = new Mock<IUploadServiceClient>();
+        _countryServiceMock = new Mock<ICountryServiceClient>();
         _loggerMock = new Mock<ILogger<Api.Services.ContactService>>();
 
-        _contactService = new Api.Services.ContactService(_context, _cache, _uploadServiceMock.Object, _loggerMock.Object);
+        _countryServiceMock.Setup(x => x.ValidateCountryExistsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        _contactService = new Api.Services.ContactService(_context, _cache, _uploadServiceMock.Object, _countryServiceMock.Object, _loggerMock.Object);
     }
 
     [Fact]
@@ -50,6 +55,7 @@ public class PaginationTests : IDisposable
                 Email = $"user{i}@example.com",
                 Subject = $"Subject {i}",
                 Message = $"Message {i}",
+                CountryId = 1,
                 ContactType = i % 2 == 0 ? ContactType.General : ContactType.Business,
                 Priority = Priority.Medium,
                 Status = ContactStatus.New,
@@ -85,6 +91,7 @@ public class PaginationTests : IDisposable
                 Email = $"user{i}@example.com",
                 Subject = $"Subject {i}",
                 Message = $"Message {i}",
+                CountryId = 1,
                 ContactType = i % 2 == 0 ? ContactType.General : ContactType.Business,
                 Priority = Priority.Medium,
                 Status = ContactStatus.New,
@@ -120,6 +127,7 @@ public class PaginationTests : IDisposable
                 Email = $"user{i}@example.com",
                 Subject = $"Subject {i}",
                 Message = $"Message {i}",
+                CountryId = 1,
                 ContactType = i % 2 == 0 ? ContactType.General : ContactType.Business,
                 Priority = Priority.Medium,
                 Status = ContactStatus.New,
@@ -153,6 +161,7 @@ public class PaginationTests : IDisposable
                 Email = $"user{i}@example.com",
                 Subject = $"Subject {i}",
                 Message = $"Message {i}",
+                CountryId = 1,
                 ContactType = i % 2 == 0 ? ContactType.General : ContactType.Business,
                 Priority = Priority.Medium,
                 Status = ContactStatus.New,

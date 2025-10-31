@@ -151,7 +151,7 @@ public class ContactsControllerTests
         };
 
         var pagination = new PaginationParameters { Page = 1, PageSize = 20 };
-        _contactServiceMock.Setup(x => x.GetContactMessagesAsync(1, 20, null, null))
+        _contactServiceMock.Setup(x => x.GetContactMessagesAsync(1, 20, null, null, null))
             .ReturnsAsync(expectedContacts);
 
         // Act
@@ -173,7 +173,7 @@ public class ContactsControllerTests
         var expectedContacts = new List<ContactMessageDto>();
 
         var pagination = new PaginationParameters { Page = 1, PageSize = 20 }; // Will be overridden by validation
-        _contactServiceMock.Setup(x => x.GetContactMessagesAsync(1, 20, ContactStatus.New, ContactType.General))
+        _contactServiceMock.Setup(x => x.GetContactMessagesAsync(1, 20, ContactStatus.New, ContactType.General, null))
             .ReturnsAsync(expectedContacts);
 
         // Act - Test parameter validation and defaults
@@ -184,7 +184,7 @@ public class ContactsControllerTests
         result.Result.Should().BeOfType<OkObjectResult>();
 
         // Verify that the service was called with corrected parameters (page=1, pageSize=20)
-        _contactServiceMock.Verify(x => x.GetContactMessagesAsync(1, 20, ContactStatus.New, ContactType.General), Times.Once);
+        _contactServiceMock.Verify(x => x.GetContactMessagesAsync(1, 20, ContactStatus.New, ContactType.General, null), Times.Once);
     }
 
     [Fact]

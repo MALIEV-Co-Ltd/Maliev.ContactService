@@ -43,9 +43,10 @@ public class ContactsControllerIntegrationTests : IClassFixture<CustomWebApplica
         var request = new CreateContactMessageRequest
         {
             FullName = "John Doe",
-            Email = "john.doe@example.com",
+            Email = "john.integration@example.com",
             Subject = "Test Subject",
             Message = "Test Message",
+            CountryId = 1,
             ContactType = ContactType.General
         };
 

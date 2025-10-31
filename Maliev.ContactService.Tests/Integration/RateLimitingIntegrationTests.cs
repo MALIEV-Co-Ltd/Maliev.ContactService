@@ -10,14 +10,16 @@ using Microsoft.Extensions.Hosting;
 namespace Maliev.ContactService.Tests.Integration;
 
 /// <summary>
-/// Integration tests for rate limiting functionality
+/// Integration tests for rate limiting functionality.
+/// Uses RateLimitingTestWebApplicationFactory which enables rate limiting
+/// with faster windows (10 seconds) for quicker test execution.
 /// </summary>
 [Trait("Category", "Integration")]
-public class RateLimitingIntegrationTests : IClassFixture<CustomWebApplicationFactory<Program>>
+public class RateLimitingIntegrationTests : IClassFixture<RateLimitingTestWebApplicationFactory>
 {
-    private readonly CustomWebApplicationFactory<Program> _factory;
+    private readonly RateLimitingTestWebApplicationFactory _factory;
 
-    public RateLimitingIntegrationTests(CustomWebApplicationFactory<Program> factory)
+    public RateLimitingIntegrationTests(RateLimitingTestWebApplicationFactory factory)
     {
         _factory = factory;
     }
@@ -27,25 +29,36 @@ public class RateLimitingIntegrationTests : IClassFixture<CustomWebApplicationFa
     {
         // Arrange
         var client = _factory.CreateClient();
-        var request = new CreateContactMessageRequest
-        {
-            FullName = "John Doe",
-            Email = "john.doe@example.com",
-            Subject = "Test Subject",
-            Message = "Test Message",
-            ContactType = ContactType.General
-        };
+        var testId = Guid.NewGuid().ToString("N");
 
-        // Act - Make 5 requests (the limit is 5 per 10 seconds)
+        // Act - Make 5 requests (the limit is 5 per 10 seconds) - use unique emails to avoid duplicate detection
         for (int i = 0; i < 5; i++)
         {
+            var request = new CreateContactMessageRequest
+            {
+                FullName = "John Doe",
+                Email = $"john.doe.{testId}.{i}@example.com",
+                Subject = "Test Subject",
+                Message = "Test Message",
+                CountryId = 1,
+                ContactType = ContactType.General
+            };
             var response = await client.PostAsJsonAsync("/v1/contacts", request);
-            response.StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests, 
+            response.StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests,
                 $"Request {i + 1} should not be rate limited");
         }
 
-        // Make one more request that should be rate limited
-        var rateLimitedResponse = await client.PostAsJsonAsync("/v1/contacts", request);
+        // Make one more request that should be rate limited (use unique email)
+        var rateLimitRequest = new CreateContactMessageRequest
+        {
+            FullName = "John Doe",
+            Email = $"john.doe.{testId}.final@example.com",
+            Subject = "Test Subject",
+            Message = "Test Message",
+            CountryId = 1,
+            ContactType = ContactType.General
+        };
+        var rateLimitedResponse = await client.PostAsJsonAsync("/v1/contacts", rateLimitRequest);
 
         // Assert
         rateLimitedResponse.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
@@ -56,26 +69,37 @@ public class RateLimitingIntegrationTests : IClassFixture<CustomWebApplicationFa
     {
         // Arrange
         var client = _factory.CreateClient();
-        var request = new CreateContactMessageRequest
-        {
-            FullName = "Jane Doe",
-            Email = "jane.doe@example.com",
-            Subject = "Test Subject",
-            Message = "Test Message",
-            ContactType = ContactType.General
-        };
+        var testId = Guid.NewGuid().ToString("N");
 
-        // Act - Make 5 requests to hit the rate limit
+        // Act - Make 5 requests to hit the rate limit (use unique emails to avoid duplicate detection)
         for (int i = 0; i < 5; i++)
         {
+            var request = new CreateContactMessageRequest
+            {
+                FullName = "Jane Doe",
+                Email = $"jane.doe.{testId}.{i}@example.com",
+                Subject = "Test Subject",
+                Message = "Test Message",
+                CountryId = 1,
+                ContactType = ContactType.General
+            };
             await client.PostAsJsonAsync("/v1/contacts", request);
         }
 
         // Wait for rate limit window to reset (10 seconds)
         await Task.Delay(TimeSpan.FromSeconds(11));
 
-        // Make another request which should be allowed now
-        var response = await client.PostAsJsonAsync("/v1/contacts", request);
+        // Make another request which should be allowed now (use unique email)
+        var finalRequest = new CreateContactMessageRequest
+        {
+            FullName = "Jane Doe",
+            Email = $"jane.doe.{testId}.final@example.com",
+            Subject = "Test Subject",
+            Message = "Test Message",
+            CountryId = 1,
+            ContactType = ContactType.General
+        };
+        var response = await client.PostAsJsonAsync("/v1/contacts", finalRequest);
 
         // Assert
         response.StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests);
