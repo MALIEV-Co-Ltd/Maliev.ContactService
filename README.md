@@ -4,13 +4,16 @@ A comprehensive contact form management service for Maliev Co. Ltd., built with 
 
 ## Features
 
-- **Contact Form Submission**: Anonymous contact form submission with file upload support
+- **Contact Form Submission**: Anonymous contact form submission with file upload support and country selection
 - **Admin Management**: Full CRUD operations for contact messages with JWT authentication
 - **File Management**: Integration with UploadService for secure file storage and retrieval
-- **Rate Limiting**: Protective rate limiting for contact submissions and admin operations
+- **Country Validation**: Real-time country verification via Country Service integration
+- **Duplicate Prevention**: 60-second duplicate inquiry detection per email address
+- **Rate Limiting**: Protective rate limiting for contact submissions (10 req/hour) and admin operations (100 req/hour)
 - **Real-time Monitoring**: Prometheus metrics and health checks for observability
 - **Comprehensive Caching**: Memory-based caching for improved performance
-- **Database Integration**: PostgreSQL with Entity Framework Core for data persistence
+- **Database Integration**: PostgreSQL with Entity Framework Core and optimistic concurrency control
+- **Concurrent Update Protection**: Row versioning to prevent conflicting updates
 
 ## Architecture
 
@@ -18,7 +21,7 @@ The service follows a clean architecture pattern with the following projects:
 
 - **Maliev.ContactService.Api**: Web API controllers and HTTP endpoints
 - **Maliev.ContactService.Data**: Database models, DbContext, and data access layer
-- **Maliev.ContactService.Tests**: Comprehensive test suite with 43 test cases
+- **Maliev.ContactService.Tests**: Comprehensive test suite with 80 test cases
 
 ## API Endpoints
 
@@ -26,27 +29,28 @@ The service follows a clean architecture pattern with the following projects:
 
 | Method | Endpoint | Description | Rate Limit |
 |--------|----------|-------------|------------|
-| POST | `/v1/contacts` | Submit contact form | 10 req/min per IP |
+| POST | `/contacts/v1` | Submit contact form (requires countryId) | 10 req/hour per IP |
 
 ### Admin Endpoints (Requires JWT Authentication)
 
 | Method | Endpoint | Description | Rate Limit |
 |--------|----------|-------------|------------|
-| GET | `/v1/contacts` | List contact messages with pagination | 1000 req/min per IP |
-| GET | `/v1/contacts/{id}` | Get specific contact message | 1000 req/min per IP |
-| PUT | `/v1/contacts/{id}/status` | Update contact status | 1000 req/min per IP |
-| DELETE | `/v1/contacts/{id}` | Delete contact message | 1000 req/min per IP |
-| GET | `/v1/contacts/{id}/files` | List contact files | 1000 req/min per IP |
-| GET | `/v1/contacts/{id}/files/{fileId}/download` | Download file | 1000 req/min per IP |
-| DELETE | `/v1/contacts/{id}/files/{fileId}` | Delete file | 1000 req/min per IP |
+| GET | `/contacts/v1` | List contact messages with pagination | 100 req/hour per IP |
+| GET | `/contacts/v1/{id}` | Get specific contact message | 100 req/hour per IP |
+| PUT | `/contacts/v1/{id}/status` | Update contact status | 100 req/hour per IP |
+| DELETE | `/contacts/v1/{id}` | Delete contact message | 100 req/hour per IP |
+| GET | `/contacts/v1/{id}/files` | List contact files | 100 req/hour per IP |
+| GET | `/contacts/v1/{id}/files/{fileId}/download` | Download file | 100 req/hour per IP |
+| DELETE | `/contacts/v1/{id}/files/{fileId}` | Delete file | 100 req/hour per IP |
 
 ## Data Models
 
 ### Contact Types
 - **General**: General inquiries
 - **Business**: Business partnership inquiries
-- **Quotation**: Quotation requests
 - **Supplier**: Supplier-related communications
+
+**Note**: Quotation requests are handled by a separate Quotation Service and are not accepted through the Contact Service.
 
 ### Priority Levels
 - **Low**: Non-urgent inquiries
@@ -124,24 +128,40 @@ The service is configured for GitOps deployment with:
 
 ```json
 {
-  "Cache": {
-    "MaxCacheSize": 1000,
-    "DefaultExpirationMinutes": 5
+  "RateLimiting": {
+    "FixedWindow": {
+      "PermitLimit": 10,
+      "Window": "01:00:00"
+    },
+    "GlobalFixedWindow": {
+      "PermitLimit": 100,
+      "Window": "01:00:00"
+    }
   },
   "UploadService": {
     "BaseUrl": "http://upload-service-url",
     "TimeoutSeconds": 30
+  },
+  "CountryService": {
+    "BaseUrl": "http://country-service-url",
+    "TimeoutSeconds": 10
   }
 }
 ```
 
+**Required Services**:
+- **Country Service**: Must be running and accessible for contact form validation. The service validates that the selected country exists and is active before accepting contact inquiries.
+
 ## Testing
 
-The service includes comprehensive test coverage with 43 test cases:
+The service includes comprehensive test coverage with 86 test cases:
 
 ```bash
 # Run all tests
 dotnet test Maliev.ContactService.sln
+
+# Run integration tests only (requires Docker)
+dotnet test --filter "Purpose=LocalTesting"
 
 # Run with coverage
 dotnet test --collect:"XPlat Code Coverage"
@@ -149,9 +169,50 @@ dotnet test --collect:"XPlat Code Coverage"
 
 ### Test Categories
 
-- **Model Tests** (7 tests): DTO validation and enum testing
-- **Service Tests** (18 tests): Business logic, caching, file operations
-- **Controller Tests** (18 tests): HTTP endpoints, error handling, authentication
+- **Model Tests** (15 tests): DTO validation and enum testing
+- **Service Tests** (39 tests): Business logic, caching, file operations, country validation, duplicate detection
+- **Controller Tests** (19 tests): HTTP endpoints, error handling, authentication
+- **Integration Tests** (7 tests): End-to-end testing with real PostgreSQL via Testcontainers
+
+### Integration Testing with Testcontainers
+
+Integration tests use **Testcontainers** to provide real PostgreSQL databases for testing. This ensures tests run against actual database behavior, not in-memory simulations.
+
+**Prerequisites**: Docker Desktop must be running
+
+**What is Testcontainers?**
+- Automatically manages Docker containers for testing
+- Spins up real PostgreSQL databases before tests
+- Applies EF Core migrations automatically
+- Cleans up containers after tests complete
+- Works on any machine with Docker (local, CI/CD)
+
+**How it works:**
+1. Test run starts
+2. Testcontainers pulls `postgres:17.5` image (first run only, ~30-40 seconds)
+3. Starts PostgreSQL container with fresh database
+4. Applies all EF Core migrations
+5. Tests run against real PostgreSQL
+6. Container automatically deleted after tests
+
+**Subsequent test runs**: ~10-15 seconds (image cached)
+
+**Key benefits:**
+- ✅ Real PostgreSQL behavior (transactions, indexes, SQL functions)
+- ✅ Tests verify migrations work correctly
+- ✅ No manual database setup or port-forwarding
+- ✅ Reproducible across all environments
+- ✅ Automatic cleanup
+
+### Key Test Scenarios
+- Duplicate inquiry prevention (60-second window)
+- Country Service integration and validation
+- Rate limiting enforcement (10 req/hour public, 100 req/hour admin)
+- Optimistic concurrency control with RowVersion
+- File upload and download operations
+- Cache invalidation strategies
+- Health check endpoints (liveness and readiness)
+- Exception handling with proper HTTP status codes
 
 ## Monitoring & Observability
 
@@ -171,12 +232,14 @@ dotnet test --collect:"XPlat Code Coverage"
 
 ## Security Features
 
-- **Rate Limiting**: Sliding window rate limiter with IP-based partitioning
+- **Rate Limiting**: Fixed window rate limiter with IP-based partitioning (10 req/hour public, 100 req/hour admin)
+- **Duplicate Prevention**: 60-second duplicate inquiry detection per email to prevent spam
 - **Authentication**: JWT Bearer token authentication for admin endpoints
 - **Authorization**: Role-based access control
-- **Input Validation**: Comprehensive data annotation validation
-- **CORS**: Configured for `*.maliev.com` domains
+- **Input Validation**: Comprehensive data annotation validation with country verification
+- **CORS**: Configured for `*.maliev.com` domains with HTTPS-only in production
 - **File Security**: Virus scanning and type validation through UploadService
+- **Concurrency Control**: Optimistic locking with RowVersion to prevent conflicting updates
 
 ## Database Schema
 
@@ -187,13 +250,20 @@ dotnet test --collect:"XPlat Code Coverage"
 - Email (Required, Valid email format, Max 254 chars)
 - PhoneNumber (Optional, Max 20 chars)
 - Company (Optional, Max 200 chars)
+- CountryId (Required, Foreign Key to Country Service)
 - Subject (Required, Max 500 chars)
-- Message (Required, Text)
-- ContactType (Enum: General, Business, Quotation, Supplier)
+- Message (Required, Text, Max 10,000 chars)
+- ContactType (Enum: General=0, Business=3, Supplier=1)
 - Priority (Enum: Low, Medium, High, Urgent)
 - Status (Enum: New, InProgress, Resolved, Closed)
+- RowVersion (Concurrency token for optimistic locking)
 - CreatedAt, UpdatedAt, ResolvedAt (Timestamps)
 ```
+
+**Database Indexes**:
+- `IX_ContactMessages_Email_CreatedAt`: Composite index for duplicate detection
+- `IX_ContactMessages_Status_ContactType`: Composite index for admin filtering
+- `IX_ContactMessages_Priority_Status_Filtered`: Filtered index for priority triage (Status IN (New, InProgress))
 
 ### ContactFiles Table
 ```sql
@@ -219,6 +289,8 @@ dotnet test --collect:"XPlat Code Coverage"
 - **Structured Logging**: Detailed error tracking with correlation IDs
 - **Graceful Degradation**: Service continues operating during UploadService outages
 - **Validation**: Comprehensive input validation with detailed error responses
+- **User-Friendly Errors**: Specific error messages for duplicate inquiries (409), country service issues (503), and invalid data (400)
+- **Audit Logging**: Comprehensive audit trail for all contact inquiry operations
 
 ## CI/CD Pipeline
 

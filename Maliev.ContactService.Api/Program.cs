@@ -55,11 +55,24 @@ try
     // Add controllers
     builder.Services.AddControllers();
 
-    // Configure Contact DbContext
-    if (builder.Environment.IsEnvironment("Testing"))
+    // T039: Configure FormOptions for multipart body length limit (250MB)
+    builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
     {
-        builder.Services.AddDbContext<ContactDbContext>(options =>
-            options.UseInMemoryDatabase("TestDb"));
+        options.MultipartBodyLengthLimit = 262144000; // 250MB in bytes
+    });
+
+    // Configure Contact DbContext
+    // In Testing/RateLimitTesting environment, skip DbContext if using Testcontainers
+    if (builder.Environment.IsEnvironment("Testing") || builder.Environment.IsEnvironment("RateLimitTesting"))
+    {
+        // Skip DbContext configuration if using Testcontainers
+        // Testcontainers tests will configure DbContext in ConfigureWebHost
+        var useTestcontainers = builder.Configuration.GetValue<bool>("UseTestcontainers");
+        if (!useTestcontainers)
+        {
+            builder.Services.AddDbContext<ContactDbContext>(options =>
+                options.UseInMemoryDatabase("TestDb"));
+        }
     }
     else
     {
@@ -69,37 +82,37 @@ try
         });
     }
 
-    // Configure memory cache with size limit to prevent unbounded growth
-    builder.Services.AddMemoryCache(options =>
+    // Configure memory cache (simple configuration per CLAUDE.md standards)
+    builder.Services.AddMemoryCache();
+
+    // Configure rate limiting (skip in Testing environment)
+    if (!builder.Environment.IsEnvironment("Testing"))
     {
-        options.SizeLimit = 1024; // Set a reasonable size limit in your preferred units
-    });
-
-    // Configure rate limiting
-    builder.Services.AddRateLimiter(options =>
-    {
-        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-
-        var rateLimitingConfig = builder.Configuration.GetSection("RateLimiting");
-        var fixedWindowOptions = rateLimitingConfig.GetSection("FixedWindow").Get<FixedWindowRateLimiterOptions>();
-        var globalFixedWindowOptions = rateLimitingConfig.GetSection("GlobalFixedWindow").Get<FixedWindowRateLimiterOptions>();
-
-        if (globalFixedWindowOptions != null)
+        builder.Services.AddRateLimiter(options =>
         {
-            options.AddPolicy("GlobalPolicy", context =>
-                RateLimitPartition.GetFixedWindowLimiter(
-                    partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                    factory: _ => globalFixedWindowOptions));
-        }
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-        if (fixedWindowOptions != null)
-        {
-            options.AddPolicy("ContactPolicy", context =>
-                RateLimitPartition.GetFixedWindowLimiter(
-                    partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                    factory: _ => fixedWindowOptions));
-        }
-    });
+            var rateLimitingConfig = builder.Configuration.GetSection("RateLimiting");
+            var fixedWindowOptions = rateLimitingConfig.GetSection("FixedWindow").Get<FixedWindowRateLimiterOptions>();
+            var globalFixedWindowOptions = rateLimitingConfig.GetSection("GlobalFixedWindow").Get<FixedWindowRateLimiterOptions>();
+
+            if (globalFixedWindowOptions != null)
+            {
+                options.AddPolicy("GlobalPolicy", context =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                        factory: _ => globalFixedWindowOptions));
+            }
+
+            if (fixedWindowOptions != null)
+            {
+                options.AddPolicy("ContactPolicy", context =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                        factory: _ => fixedWindowOptions));
+            }
+        });
+    }
 
     // Configure UploadService options
     builder.Services.Configure<UploadServiceOptions>(builder.Configuration.GetSection(UploadServiceOptions.SectionName));
@@ -120,13 +133,40 @@ try
             .ValidateDataAnnotations();
     }
 
-    // Configure HTTP client for UploadService
-    builder.Services.AddHttpClient<IUploadServiceClient, UploadServiceClient>((serviceProvider, client) =>
+    // Configure HTTP client for UploadService (skip in Testing - tests will provide mock)
+    if (!builder.Environment.IsEnvironment("Testing"))
     {
-        var uploadServiceOptions = serviceProvider.GetRequiredService<IOptions<UploadServiceOptions>>().Value;
-        client.BaseAddress = new Uri(uploadServiceOptions.BaseUrl);
-        client.Timeout = TimeSpan.FromSeconds(uploadServiceOptions.TimeoutSeconds);
-    });
+        builder.Services.AddHttpClient<IUploadServiceClient, UploadServiceClient>((serviceProvider, client) =>
+        {
+            var uploadServiceOptions = serviceProvider.GetRequiredService<IOptions<UploadServiceOptions>>().Value;
+            client.BaseAddress = new Uri(uploadServiceOptions.BaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(uploadServiceOptions.TimeoutSeconds);
+        });
+    }
+
+    // Configure CountryService options
+    builder.Services.Configure<CountryServiceOptions>(builder.Configuration.GetSection("CountryService"));
+
+    // Configure development fallbacks for CountryService
+    if (builder.Environment.IsDevelopment())
+    {
+        builder.Services.Configure<CountryServiceOptions>(options =>
+        {
+            if (string.IsNullOrEmpty(options.BaseUrl))
+            {
+                options.BaseUrl = "http://localhost:8080";
+            }
+            options.TimeoutSeconds = 10;
+        });
+    }
+
+    // Configure HTTP client for CountryService (skip in Testing - tests will provide mock)
+    // Note: Polly retry/circuit breaker policies would be added here if Polly package is installed
+    // For now, relying on HttpClient timeout configured in CountryServiceClient
+    if (!builder.Environment.IsEnvironment("Testing"))
+    {
+        builder.Services.AddHttpClient<ICountryServiceClient, CountryServiceClient>();
+    }
 
     // Register services
     builder.Services.AddScoped<IContactService, ContactService>();
@@ -320,6 +360,9 @@ try
 
     var app = builder.Build();
 
+    // Configure base path for all routes
+    app.UsePathBase("/contacts");
+
     app.UseForwardedHeaders();
     app.UseHttpsRedirection(); // Move HTTPS redirection to be called early
 
@@ -353,7 +396,10 @@ try
     // app.UseHttpsRedirection(); // Remove from here - moved above
 
     // MANDATORY: Prometheus metrics
-    app.UseRateLimiter();
+    if (!app.Environment.IsEnvironment("Testing"))
+    {
+        app.UseRateLimiter();
+    }
     app.UseCors();
 
     // JWT Authentication & Authorization (only if configured and not in Testing environment)

@@ -86,6 +86,9 @@ namespace Maliev.ContactService.Data.Migrations
                     b.Property<int>("ContactType")
                         .HasColumnType("integer");
 
+                    b.Property<int>("CountryId")
+                        .HasColumnType("integer");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -114,6 +117,12 @@ namespace Maliev.ContactService.Data.Migrations
 
                     b.Property<DateTimeOffset?>("ResolvedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("bytea");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");

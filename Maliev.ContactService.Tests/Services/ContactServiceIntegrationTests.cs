@@ -19,6 +19,7 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
     private ContactDbContext? _context;
     private readonly IMemoryCache _cache;
     private readonly Mock<IUploadServiceClient> _uploadServiceMock;
+    private readonly Mock<ICountryServiceClient> _countryServiceMock;
     private readonly Mock<ILogger<Api.Services.ContactService>> _loggerMock;
     private Api.Services.ContactService? _contactService;
     private DbConnection? _connection;
@@ -32,7 +33,12 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
 
         _cache = new MemoryCache(new MemoryCacheOptions());
         _uploadServiceMock = new Mock<IUploadServiceClient>();
+        _countryServiceMock = new Mock<ICountryServiceClient>();
         _loggerMock = new Mock<ILogger<Api.Services.ContactService>>();
+
+        // Setup default behavior for country service mock
+        _countryServiceMock.Setup(x => x.ValidateCountryExistsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
     }
 
     public async Task InitializeAsync()
@@ -46,7 +52,7 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
         _context = new ContactDbContext(options);
         await _context.Database.MigrateAsync();
 
-        _contactService = new Api.Services.ContactService(_context, _cache, _uploadServiceMock.Object, _loggerMock.Object);
+        _contactService = new Api.Services.ContactService(_context, _cache, _uploadServiceMock.Object, _countryServiceMock.Object, _loggerMock.Object);
 
         // Set up Respawn for resetting database between tests
         _connection = _context.Database.GetDbConnection();
@@ -87,6 +93,7 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
             Email = "john.doe@example.com",
             Subject = "Test Inquiry",
             Message = "This is a test message",
+            CountryId = 1,
             ContactType = ContactType.General,
             Priority = Priority.High
         };
@@ -127,7 +134,8 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
             Email = "jane.doe@example.com",
             Subject = "Quotation Request",
             Message = "Please provide a quote",
-            ContactType = ContactType.Quotation,
+            CountryId = 1,
+            ContactType = ContactType.General,
             Files = new List<CreateContactFileRequest>
             {
                 new CreateContactFileRequest
@@ -186,6 +194,7 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
             Email = "test@example.com",
             Subject = "Test Subject",
             Message = "Test Message",
+            CountryId = 1,
             ContactType = ContactType.Business,
             Priority = Priority.Medium,
             Status = ContactStatus.New,
@@ -230,6 +239,7 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
                 Email = $"user{i}@example.com",
                 Subject = $"Subject {i}",
                 Message = $"Message {i}",
+            CountryId = 1,
                 ContactType = i % 2 == 0 ? ContactType.General : ContactType.Business,
                 Priority = Priority.Medium,
                 Status = ContactStatus.New,
@@ -272,6 +282,7 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
             Email = "update@example.com",
             Subject = "Update Subject",
             Message = "Update Message",
+            CountryId = 1,
             ContactType = ContactType.General,
             Priority = Priority.Medium,
             Status = ContactStatus.New,
@@ -317,6 +328,7 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
             Email = "delete@example.com",
             Subject = "Delete Subject",
             Message = "Delete Message",
+            CountryId = 1,
             ContactType = ContactType.General,
             Priority = Priority.Medium,
             Status = ContactStatus.New,

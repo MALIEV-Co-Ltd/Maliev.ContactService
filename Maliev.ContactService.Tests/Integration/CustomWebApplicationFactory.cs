@@ -17,16 +17,34 @@ public class CustomWebApplicationFactory<TProgram> : WebApplicationFactory<TProg
         builder.ConfigureServices(services =>
         {
             // Remove the real IUploadServiceClient registration
-            var descriptor = services.SingleOrDefault(
+            var uploadServiceDescriptor = services.SingleOrDefault(
                 d => d.ServiceType == typeof(IUploadServiceClient));
 
-            if (descriptor != null)
+            if (uploadServiceDescriptor != null)
             {
-                services.Remove(descriptor);
+                services.Remove(uploadServiceDescriptor);
             }
 
-            // Add the mock implementation
+            // Add the mock implementation for IUploadServiceClient
             services.AddScoped<IUploadServiceClient, MockUploadServiceClient>();
+
+            // Remove the real ICountryServiceClient registration
+            var countryServiceDescriptor = services.SingleOrDefault(
+                d => d.ServiceType == typeof(ICountryServiceClient));
+
+            if (countryServiceDescriptor != null)
+            {
+                services.Remove(countryServiceDescriptor);
+            }
+
+            // Add the mock implementation for ICountryServiceClient
+            services.AddScoped<ICountryServiceClient, MockCountryServiceClient>();
+
+            // Disable rate limiting for tests to avoid interference between test cases
+            services.PostConfigure<Microsoft.AspNetCore.RateLimiting.RateLimiterOptions>(options =>
+            {
+                options.GlobalLimiter = null;
+            });
 
             services.AddAuthentication(TestAuthHandler.TestScheme)
                 .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(

@@ -1,3 +1,4 @@
+using Maliev.ContactService.Api.Exceptions;
 using Maliev.ContactService.Api.Models;
 using Maliev.ContactService.Data.DbContexts;
 using Maliev.ContactService.Data.Models;
@@ -12,15 +13,22 @@ public class ContactService : IContactService
     private readonly ContactDbContext _context;
     private readonly IMemoryCache _cache;
     private readonly IUploadServiceClient _uploadService;
+    private readonly ICountryServiceClient _countryService;
     private readonly ILogger<ContactService> _logger;
     private static readonly TimeSpan CacheExpiry = TimeSpan.FromMinutes(5);
     private static CancellationTokenSource _cacheCts = new CancellationTokenSource();
 
-    public ContactService(ContactDbContext context, IMemoryCache cache, IUploadServiceClient uploadService, ILogger<ContactService> logger)
+    public ContactService(
+        ContactDbContext context,
+        IMemoryCache cache,
+        IUploadServiceClient uploadService,
+        ICountryServiceClient countryService,
+        ILogger<ContactService> logger)
     {
         _context = context;
         _cache = cache;
         _uploadService = uploadService;
+        _countryService = countryService;
         _logger = logger;
     }
 
@@ -30,6 +38,30 @@ public class ContactService : IContactService
         {
             throw new ArgumentNullException(nameof(request));
         }
+
+        // FR-022: Check for duplicate inquiries from same email within 60 seconds
+        // This prevents spam and accidental duplicate submissions by checking if the same email
+        // has submitted an inquiry within the last 60 seconds. Uses the IX_ContactMessages_Email_CreatedAt
+        // composite index for efficient querying. Returns 409 Conflict if duplicate is detected.
+        var sixtySecondsAgo = DateTimeOffset.UtcNow.AddSeconds(-60);
+        var hasDuplicateInquiry = await _context.ContactMessages
+            .AnyAsync(c => c.Email == request.Email && c.CreatedAt > sixtySecondsAgo);
+
+        if (hasDuplicateInquiry)
+        {
+            _logger.LogWarning("Duplicate inquiry detected for email {Email} within 60 seconds", request.Email);
+            throw new DuplicateInquiryException();
+        }
+
+        // FR-007: Validate country exists and is active via Country Service
+        bool isValidCountry = await _countryService.ValidateCountryExistsAsync(request.CountryId);
+        if (!isValidCountry)
+        {
+            _logger.LogWarning("Invalid or inactive country ID {CountryId} for email {Email}", request.CountryId, request.Email);
+            throw new ArgumentException($"Country ID {request.CountryId} is not valid or is not currently accepting inquiries.", nameof(request.CountryId));
+        }
+
+        _logger.LogInformation("Creating contact inquiry for {Email} with country ID {CountryId}", request.Email, request.CountryId);
 
         // Check if the database provider supports transactions
         var isTransactionSupported = _context.Database.ProviderName != "Microsoft.EntityFrameworkCore.InMemory";
@@ -45,6 +77,7 @@ public class ContactService : IContactService
                 Company = request.Company,
                 Subject = request.Subject,
                 Message = request.Message,
+                CountryId = request.CountryId,
                 ContactType = request.ContactType,
                 Priority = request.Priority,
                 Status = ContactStatus.New,
@@ -105,18 +138,44 @@ public class ContactService : IContactService
             {
                 await transaction.CommitAsync();
             }
-            
-            _logger.LogInformation("Created contact message {ContactId} from {Email}", contactMessage.Id, contactMessage.Email);
+
+            // FR-026: Audit logging for successful inquiry
+            _logger.LogInformation(
+                "Contact inquiry created successfully. ID={ContactId}, Email={Email}, CountryId={CountryId}, Type={ContactType}, FileCount={FileCount}",
+                contactMessage.Id, contactMessage.Email, contactMessage.CountryId, contactMessage.ContactType, request.Files.Count);
 
             return await GetContactMessageByIdAsync(contactMessage.Id) ?? throw new InvalidOperationException("Failed to retrieve created contact message");
         }
-        catch (Exception ex)
+        catch (DuplicateInquiryException ex)
         {
+            // FR-026: Audit logging for duplicate inquiry attempt
+            _logger.LogWarning("Duplicate inquiry attempt blocked. Email={Email}, Reason={Reason}", request.Email, ex.Message);
             if (transaction != null)
             {
                 await transaction.RollbackAsync();
             }
-            _logger.LogError(ex, "Failed to create contact message");
+            throw;
+        }
+        catch (CountryServiceException ex)
+        {
+            // FR-026: Audit logging for Country Service failure
+            _logger.LogError(ex, "Country Service unavailable during inquiry creation. Email={Email}, CountryId={CountryId}",
+                request.Email, request.CountryId);
+            if (transaction != null)
+            {
+                await transaction.RollbackAsync();
+            }
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // FR-026: Audit logging for failed inquiry
+            _logger.LogError(ex, "Failed to create contact inquiry. Email={Email}, CountryId={CountryId}, Error={Error}",
+                request.Email, request.CountryId, ex.Message);
+            if (transaction != null)
+            {
+                await transaction.RollbackAsync();
+            }
             throw; // Re-throw the exception to be handled by the global exception handler
         }
         finally
@@ -145,10 +204,9 @@ public class ContactService : IContactService
 
         var contactDto = MapToDto(contact);
         var cacheEntryOptions = new MemoryCacheEntryOptions()
-            .SetSize(1) // Set size of cache entry
             .SetAbsoluteExpiration(CacheExpiry)
             .AddExpirationToken(new CancellationChangeToken(_cacheCts.Token));
-        
+
         _cache.Set(cacheKey, contactDto, cacheEntryOptions);
 
         return contactDto;
@@ -158,7 +216,8 @@ public class ContactService : IContactService
         int page = 1,
         int pageSize = 20,
         ContactStatus? status = null,
-        ContactType? contactType = null)
+        ContactType? contactType = null,
+        string? email = null)
     {
         // Create a cache key based on the parameters
         var cacheKey = $"contact_messages_page{page}_size{pageSize}";
@@ -166,6 +225,8 @@ public class ContactService : IContactService
             cacheKey += $"_status{status.Value}";
         if (contactType.HasValue)
             cacheKey += $"_type{contactType.Value}";
+        if (!string.IsNullOrWhiteSpace(email))
+            cacheKey += $"_email{email}";
 
         // Try to get from cache first
         if (_cache.TryGetValue(cacheKey, out IEnumerable<ContactMessageDto>? cachedContacts))
@@ -183,6 +244,11 @@ public class ContactService : IContactService
         if (contactType.HasValue)
             query = query.Where(c => c.ContactType == contactType.Value);
 
+        // T041: Email filtering
+        if (!string.IsNullOrWhiteSpace(email))
+            query = query.Where(c => c.Email.ToLower() == email.ToLower());
+
+        // T045: Default ORDER BY CreatedAt DESC (already implemented)
         var contacts = await query
             .OrderByDescending(c => c.CreatedAt)
             .ThenByDescending(c => c.Id) // Secondary sort by ID for deterministic results when CreatedAt is the same
@@ -191,10 +257,9 @@ public class ContactService : IContactService
             .ToListAsync();
 
         var result = contacts.Select(MapToDto).ToList();
-        
+
         // Cache the result with cancellation token for invalidation
         var cacheEntryOptions = new MemoryCacheEntryOptions()
-            .SetSize(1) // Set size of cache entry
             .SetAbsoluteExpiration(CacheExpiry)
             .AddExpirationToken(new CancellationChangeToken(_cacheCts.Token));
         
@@ -206,8 +271,19 @@ public class ContactService : IContactService
     public async Task<ContactMessageDto> UpdateContactStatusAsync(int id, UpdateContactStatusRequest request)
     {
         var contact = await _context.ContactMessages.FindAsync(id);
-        if (contact == null) 
+        if (contact == null)
             throw new Maliev.ContactService.Api.Exceptions.NotFoundException($"Contact message with id {id} not found");
+
+        // T042: Check for concurrent updates (UpdatedAt within 5 minutes)
+        var fiveMinutesAgo = DateTimeOffset.UtcNow.AddMinutes(-5);
+        if (contact.UpdatedAt > fiveMinutesAgo)
+        {
+            _logger.LogWarning(
+                "Potential concurrent update detected for contact {ContactId}. Last update was at {UpdatedAt}, only {Minutes} minutes ago.",
+                id,
+                contact.UpdatedAt,
+                (DateTimeOffset.UtcNow - contact.UpdatedAt).TotalMinutes);
+        }
 
         contact.Status = request.Status;
         if (request.Priority.HasValue)
@@ -220,7 +296,17 @@ public class ContactService : IContactService
             contact.ResolvedAt = DateTimeOffset.UtcNow;
         }
 
-        await _context.SaveChangesAsync();
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            // T043: Handle concurrency exception with 409 Conflict
+            _logger.LogError(ex, "Concurrency conflict detected while updating contact {ContactId}", id);
+            throw new InvalidOperationException(
+                $"The contact message was modified by another user. Please refresh and try again.", ex);
+        }
 
         // Invalidate all cache entries
         InvalidateAllCache();
@@ -333,6 +419,7 @@ public class ContactService : IContactService
             Company = contact.Company,
             Subject = contact.Subject,
             Message = contact.Message,
+            CountryId = contact.CountryId,
             ContactType = contact.ContactType,
             Priority = contact.Priority,
             Status = contact.Status,
