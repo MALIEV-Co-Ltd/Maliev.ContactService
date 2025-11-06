@@ -252,19 +252,19 @@ try
 
             if (missingValues.Count > 0)
             {
-                Log.Error("JWT configuration validation failed. Missing required values: {MissingValues}", string.Join(", ", missingValues));
-                throw new InvalidOperationException($"JWT configuration is incomplete. Missing: {string.Join(", ", missingValues)}");
+                Log.Warning("JWT configuration incomplete. Missing required values: {MissingValues}. Authentication will be disabled.", string.Join(", ", missingValues));
+                // Don't configure JWT authentication if configuration is incomplete
             }
-
-            // Validate security key strength
-            if (jwtOptions.SecurityKey.Length < 32)
+            else
             {
-                Log.Error("JWT SecurityKey must be at least 32 characters for security");
-                throw new InvalidOperationException("JWT SecurityKey is too weak. Must be at least 32 characters.");
-            }
+                // Validate security key strength
+                if (jwtOptions.SecurityKey.Length < 32)
+                {
+                    Log.Warning("JWT SecurityKey is weak (less than 32 characters). Recommended to use at least 32 characters for security.");
+                }
 
-            builder.Services.Configure<JwtOptions>(jwtSection);
-            builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                builder.Services.Configure<JwtOptions>(jwtSection);
+                builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 .AddJwtBearer(options =>
                 {
                     options.TokenValidationParameters = new TokenValidationParameters
@@ -302,13 +302,14 @@ try
                     };
                 });
 
-            Log.Information("JWT Authentication configured with issuer: {Issuer}, audience: {Audience}",
-                jwtOptions.Issuer, jwtOptions.Audience);
+                Log.Information("JWT Authentication configured with issuer: {Issuer}, audience: {Audience}",
+                    jwtOptions.Issuer, jwtOptions.Audience);
+            }
         }
         else
         {
-            Log.Error("JWT configuration section '{SectionName}' not found - authentication will be disabled", JwtOptions.SectionName);
-            throw new InvalidOperationException($"JWT configuration section '{JwtOptions.SectionName}' is required for authentication in {builder.Environment.EnvironmentName} environment");
+            Log.Warning("JWT configuration section '{SectionName}' not found - authentication will be disabled", JwtOptions.SectionName);
+            // Don't throw - allow service to start without JWT authentication
         }
     }
 
