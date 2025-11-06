@@ -234,39 +234,31 @@ try
         });
     });
 
-    // Configure JWT Authentication (skip in Testing environment)
+    // Configure JWT Authentication with RSA public key validation (skip in Testing environment)
     if (!builder.Environment.IsEnvironment("Testing"))
     {
         var jwtSection = builder.Configuration.GetSection(JwtOptions.SectionName);
         if (jwtSection.Exists())
         {
-            // Bind and validate JWT configuration
-            var jwtOptions = new JwtOptions();
-            jwtSection.Bind(jwtOptions);
-
-            // Validate JWT configuration
-            var missingValues = new List<string>();
-            if (string.IsNullOrEmpty(jwtOptions.Issuer)) missingValues.Add("Issuer");
-            if (string.IsNullOrEmpty(jwtOptions.Audience)) missingValues.Add("Audience");
-            if (string.IsNullOrEmpty(jwtOptions.SecurityKey)) missingValues.Add("SecurityKey");
-
-            if (missingValues.Count > 0)
-            {
-                Log.Warning("JWT configuration incomplete. Missing required values: {MissingValues}. Authentication will be disabled.", string.Join(", ", missingValues));
-                // Don't configure JWT authentication if configuration is incomplete
-            }
-            else
-            {
-                // Validate security key strength
-                if (jwtOptions.SecurityKey.Length < 32)
-                {
-                    Log.Warning("JWT SecurityKey is weak (less than 32 characters). Recommended to use at least 32 characters for security.");
-                }
-
-                builder.Services.Configure<JwtOptions>(jwtSection);
-                builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 .AddJwtBearer(options =>
                 {
+                    var jwtOptions = new JwtOptions
+                    {
+                        Issuer = "default-issuer",
+                        Audience = "default-audience",
+                        PublicKey = "default-key"
+                    };
+                    jwtSection.Bind(jwtOptions);
+
+                    // Use RSA public key validation from shared config (maliev-shared-secrets)
+                    var publicKeyBytes = Convert.FromBase64String(jwtOptions.PublicKey);
+                    var publicKeyPem = Encoding.UTF8.GetString(publicKeyBytes);
+
+                    // Import RSA public key from PEM format
+                    var rsa = System.Security.Cryptography.RSA.Create();
+                    rsa.ImportFromPem(publicKeyPem);
+
                     options.TokenValidationParameters = new TokenValidationParameters
                     {
                         ValidateIssuer = true,
@@ -275,18 +267,15 @@ try
                         ValidateIssuerSigningKey = true,
                         ValidIssuer = jwtOptions.Issuer,
                         ValidAudience = jwtOptions.Audience,
-                        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SecurityKey)),
-                        ClockSkew = TimeSpan.FromMinutes(5), // Allow 5 minutes clock skew
-                        RequireExpirationTime = true,
-                        RequireSignedTokens = true
+                        IssuerSigningKey = new RsaSecurityKey(rsa)
                     };
 
                     // Enhanced security options
                     options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
-                    options.SaveToken = false; // Don't store tokens in AuthenticationProperties
+                    options.SaveToken = false;
                     options.IncludeErrorDetails = builder.Environment.IsDevelopment();
 
-                    // Event handlers for better security logging
+                    // Event handlers for security logging
                     options.Events = new JwtBearerEvents
                     {
                         OnAuthenticationFailed = context =>
@@ -302,14 +291,11 @@ try
                     };
                 });
 
-                Log.Information("JWT Authentication configured with issuer: {Issuer}, audience: {Audience}",
-                    jwtOptions.Issuer, jwtOptions.Audience);
-            }
+            Log.Information("JWT Authentication configured with RSA public key validation");
         }
         else
         {
-            Log.Warning("JWT configuration section '{SectionName}' not found - authentication will be disabled", JwtOptions.SectionName);
-            // Don't throw - allow service to start without JWT authentication
+            Log.Warning("JWT configuration not found - API will start but authentication will not work. Configure JWT secrets for full functionality.");
         }
     }
 
@@ -484,9 +470,9 @@ public class JwtOptions
 {
     public const string SectionName = "Jwt";
 
-    public string Issuer { get; set; } = null!;
-    public string Audience { get; set; } = null!;
-    public string SecurityKey { get; set; } = null!;
+    public required string Issuer { get; set; }
+    public required string Audience { get; set; }
+    public required string PublicKey { get; set; } // Base64-encoded RSA public key from shared config
 }
 
 // Make Program class accessible for integration tests
