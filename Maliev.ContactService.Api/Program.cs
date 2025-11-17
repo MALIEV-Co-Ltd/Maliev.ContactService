@@ -1,20 +1,21 @@
 using Asp.Versioning;
 using Asp.Versioning.ApiExplorer;
 using HealthChecks.UI.Client;
-using Maliev.ContactService.Api.Configurations;
 using Maliev.ContactService.Api.HealthChecks;
 using Maliev.ContactService.Api.Middleware;
 using Maliev.ContactService.Api.Models;
 using Maliev.ContactService.Api.Services;
 using Maliev.ContactService.Data.DbContexts;
+using MassTransit;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using Scalar.AspNetCore;
 using Serilog;
-using Swashbuckle.AspNetCore.SwaggerGen;
+using StackExchange.Redis;
 using System.Text;
 using System.Threading.RateLimiting;
 
@@ -37,6 +38,71 @@ try
     if (Directory.Exists(secretsPath))
     {
         builder.Configuration.AddKeyPerFile(directoryPath: secretsPath, optional: true);
+    }
+
+    // Redis Distributed Cache Configuration
+    var redisConnectionString = builder.Configuration["Redis:ConnectionString"];
+    var redisEnabled = bool.TryParse(builder.Configuration["Redis:Enabled"], out var isRedisEnabled) && isRedisEnabled;
+
+    if (redisEnabled && !string.IsNullOrEmpty(redisConnectionString) && !builder.Environment.IsEnvironment("Testing"))
+    {
+        try
+        {
+            builder.Services.AddStackExchangeRedisCache(options =>
+            {
+                options.Configuration = redisConnectionString;
+                options.InstanceName = "Contact:";
+            });
+
+            var redis = ConnectionMultiplexer.Connect(redisConnectionString);
+            builder.Services.AddSingleton<IConnectionMultiplexer>(redis);
+
+            Log.Information("Redis distributed cache configured: {RedisConnectionString}", redisConnectionString);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Redis connection failed - will use in-memory cache fallback");
+        }
+    }
+    else
+    {
+        Log.Information("Redis disabled or not configured - using in-memory cache only");
+    }
+
+    builder.Services.AddMemoryCache(); // Fallback in-memory cache
+
+    // RabbitMQ Configuration (MassTransit)
+    var rabbitmqHost = builder.Configuration["RabbitMQ:Host"] ?? "localhost";
+    var rabbitmqPort = int.TryParse(builder.Configuration["RabbitMQ:Port"], out var port) ? port : 5672;
+    var rabbitmqUser = builder.Configuration["RabbitMQ:Username"] ?? "guest";
+    var rabbitmqPassword = builder.Configuration["RabbitMQ:Password"] ?? "guest";
+    var rabbitmqVhost = builder.Configuration["RabbitMQ:VirtualHost"] ?? "/";
+    var rabbitmqEnabled = bool.TryParse(builder.Configuration["RabbitMQ:Enabled"], out var isRabbitmqEnabled) && isRabbitmqEnabled;
+
+    if (rabbitmqEnabled && !builder.Environment.IsEnvironment("Testing"))
+    {
+        builder.Services.AddMassTransit(x =>
+        {
+            // Add consumers here if needed in the future
+            // x.AddConsumer<SomeEventConsumer>();
+
+            x.UsingRabbitMq((context, cfg) =>
+            {
+                cfg.Host(rabbitmqHost, (ushort)rabbitmqPort, rabbitmqVhost, h =>
+                {
+                    h.Username(rabbitmqUser);
+                    h.Password(rabbitmqPassword);
+                });
+
+                cfg.ConfigureEndpoints(context);
+            });
+        });
+
+        Log.Information("MassTransit configured with RabbitMQ: {Host}:{Port}", rabbitmqHost, rabbitmqPort);
+    }
+    else
+    {
+        Log.Information("RabbitMQ/MassTransit disabled by configuration");
     }
 
     // API Versioning
@@ -123,7 +189,7 @@ try
         builder.Services.Configure<UploadServiceOptions>(options =>
         {
             options.BaseUrl = "http://localhost:8080";
-            options.TimeoutSeconds = 30;
+            options.TimeoutInSeconds = 30;
         });
     }
     else
@@ -140,12 +206,12 @@ try
         {
             var uploadServiceOptions = serviceProvider.GetRequiredService<IOptions<UploadServiceOptions>>().Value;
             client.BaseAddress = new Uri(uploadServiceOptions.BaseUrl);
-            client.Timeout = TimeSpan.FromSeconds(uploadServiceOptions.TimeoutSeconds);
+            client.Timeout = TimeSpan.FromSeconds(uploadServiceOptions.TimeoutInSeconds);
         });
     }
 
     // Configure CountryService options
-    builder.Services.Configure<CountryServiceOptions>(builder.Configuration.GetSection("CountryService"));
+    builder.Services.Configure<CountryServiceOptions>(builder.Configuration.GetSection(CountryServiceOptions.SectionName));
 
     // Configure development fallbacks for CountryService
     if (builder.Environment.IsDevelopment())
@@ -156,7 +222,7 @@ try
             {
                 options.BaseUrl = "http://localhost:8080";
             }
-            options.TimeoutSeconds = 10;
+            options.TimeoutInSeconds = 10;
         });
     }
 
@@ -170,10 +236,6 @@ try
 
     // Register services
     builder.Services.AddScoped<IContactService, ContactService>();
-
-    // Configure Swagger
-    builder.Services.AddTransient<IConfigureOptions<SwaggerGenOptions>, ConfigureSwaggerOptions>();
-    builder.Services.AddSwaggerGen();
 
     // Configure CORS - Secure HTTPS-only policy
     builder.Services.AddCors(options =>
@@ -315,10 +377,10 @@ try
         {
             // In production, trust internal Kubernetes networks
             // These are common Kubernetes service network ranges
-            options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(System.Net.IPAddress.Parse("10.0.0.0"), 8));
-            options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(System.Net.IPAddress.Parse("172.16.0.0"), 12));
-            options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(System.Net.IPAddress.Parse("192.168.0.0"), 16));
-            
+            options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse("10.0.0.0/8"));
+            options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse("172.16.0.0/12"));
+            options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse("192.168.0.0/16"));
+
             // Trust localhost for health checks and internal services
             options.KnownProxies.Add(System.Net.IPAddress.Loopback);
             options.KnownProxies.Add(System.Net.IPAddress.IPv6Loopback);
@@ -326,10 +388,10 @@ try
         else if (builder.Environment.IsStaging())
         {
             // In staging, trust internal networks
-            options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(System.Net.IPAddress.Parse("10.0.0.0"), 8));
-            options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(System.Net.IPAddress.Parse("172.16.0.0"), 12));
-            options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(System.Net.IPAddress.Parse("192.168.0.0"), 16));
-            
+            options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse("10.0.0.0/8"));
+            options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse("172.16.0.0/12"));
+            options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse("192.168.0.0/16"));
+
             // Trust localhost for health checks and internal services
             options.KnownProxies.Add(System.Net.IPAddress.Loopback);
             options.KnownProxies.Add(System.Net.IPAddress.IPv6Loopback);
@@ -342,8 +404,14 @@ try
         }
     });
 
-    builder.Services.AddHealthChecks()
+    var healthChecksBuilder = builder.Services.AddHealthChecks()
         .AddCheck<DatabaseHealthCheck>("Database Health Check", tags: new[] { "readiness" });
+
+    // Add Redis health check if enabled
+    if (redisEnabled && !string.IsNullOrEmpty(redisConnectionString))
+    {
+        healthChecksBuilder.AddRedis(redisConnectionString, "redis", tags: new[] { "readiness" });
+    }
 
     var app = builder.Build();
 
@@ -354,29 +422,26 @@ try
     app.UseHttpsRedirection(); // Move HTTPS redirection to be called early
 
     // Configure the HTTP request pipeline
-    // Enable Swagger in non-production environments
+    // Enable Scalar API Documentation in non-production environments
     // For dev cluster: set ASPNETCORE_ENVIRONMENT=Development in deployment config
     if (!app.Environment.IsProduction())
     {
-        app.UseSwagger(c =>
+        app.MapOpenApi("/contacts/openapi/{documentName}.json");
+        app.MapScalarApiReference(options =>
         {
-            c.RouteTemplate = "contacts/swagger/{documentName}/swagger.json";
-        });
-        app.UseSwaggerUI(c =>
-        {
-            var provider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
-            foreach (var description in provider.ApiVersionDescriptions)
-            {
-                c.SwaggerEndpoint($"/contacts/swagger/{description.GroupName}/swagger.json", description.GroupName.ToUpperInvariant());
-            }
-            c.RoutePrefix = "contacts/swagger";
+            options
+                .WithTitle("Maliev Contact Service API")
+                .WithTheme(Scalar.AspNetCore.ScalarTheme.Saturn)
+                .WithDefaultHttpClient(Scalar.AspNetCore.ScalarTarget.CSharp, Scalar.AspNetCore.ScalarClient.HttpClient)
+                .WithEndpointPrefix("/contacts/scalar/{documentName}")
+                .WithOpenApiRoutePattern("/contacts/openapi/{documentName}.json");
         });
 
-        Log.Information("Swagger UI enabled for {Environment} environment at /contacts/swagger", app.Environment.EnvironmentName);
+        Log.Information("Scalar API documentation enabled for {Environment} environment at /contacts/scalar/v1", app.Environment.EnvironmentName);
     }
     else
     {
-        Log.Information("Swagger UI disabled in production environment for security");
+        Log.Information("API documentation disabled in production environment for security");
     }
 
     app.UseMiddleware<ExceptionHandlingMiddleware>();

@@ -13,11 +13,11 @@ The service is already partially implemented but requires completion of Country 
 
 ## Technical Context
 
-**Language/Version**: C# / .NET 9.0
+**Language/Version**: C# / .NET 10.0
 **Primary Dependencies**:
   - ASP.NET Core 9.0 (Web API framework)
-  - Entity Framework Core 9.0.9 (ORM)
-  - Npgsql.EntityFrameworkCore.PostgreSQL 9.0.2 (PostgreSQL provider)
+  - Entity Framework Core 9.0.10 (ORM)
+  - Npgsql.EntityFrameworkCore.PostgreSQL 9.0.4 (PostgreSQL provider)
   - FluentValidation 11.5.1 (Request validation)
   - Serilog 8.0.2 (Structured logging to JSON stdout)
   - Microsoft.AspNetCore.Authentication.JwtBearer 9.0.8 (JWT RSA authentication)
