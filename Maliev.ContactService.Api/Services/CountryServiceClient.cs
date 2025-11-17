@@ -22,7 +22,7 @@ public class CountryServiceClient : ICountryServiceClient
 
         // Configure base address and timeout
         _httpClient.BaseAddress = new Uri(_options.BaseUrl);
-        _httpClient.Timeout = TimeSpan.FromSeconds(_options.TimeoutSeconds);
+        _httpClient.Timeout = TimeSpan.FromSeconds(_options.TimeoutInSeconds);
     }
 
     public async Task<bool> ValidateCountryExistsAsync(int countryId, CancellationToken cancellationToken = default)

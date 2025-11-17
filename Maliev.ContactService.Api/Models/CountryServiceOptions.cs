@@ -2,6 +2,8 @@ namespace Maliev.ContactService.Api.Models;
 
 public class CountryServiceOptions
 {
+    public const string SectionName = "ExternalServices:CountryService";
+
     public required string BaseUrl { get; set; }
-    public int TimeoutSeconds { get; set; } = 10;
+    public int TimeoutInSeconds { get; set; } = 180;
 }
