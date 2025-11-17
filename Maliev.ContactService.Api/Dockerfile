@@ -26,5 +26,22 @@ RUN dotnet publish "./Maliev.ContactService.Api.csproj" -c $BUILD_CONFIGURATION 
 # This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
 FROM base AS final
 WORKDIR /app
+
+# Ensure 'app' owns the workdir (app user already exists in ASP.NET runtime image)
+RUN chown -R app:app /app
+
+# Switch to non-root user
+USER app
+
+# Copy published application (now owned by app)
 COPY --from=publish /app/publish .
+
+# Set environment variables
+ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_ENVIRONMENT=Production
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8080/contacts/liveness || exit 1
+
 ENTRYPOINT ["dotnet", "Maliev.ContactService.Api.dll"]
