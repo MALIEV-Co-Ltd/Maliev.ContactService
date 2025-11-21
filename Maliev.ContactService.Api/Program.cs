@@ -413,6 +413,9 @@ try
         healthChecksBuilder.AddRedis(redisConnectionString, "redis", tags: new[] { "readiness" });
     }
 
+    // Add service defaults for .NET Aspire
+    builder.AddServiceDefaults();
+
     var app = builder.Build();
 
     // Configure base path for all routes

@@ -19,6 +19,7 @@
     <PackageReference Include="MassTransit" Version="8.3.4" />
     <PackageReference Include="MassTransit.RabbitMQ" Version="8.3.4" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.0.0" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
     <PackageReference Include="Serilog.AspNetCore" Version="8.0.2" />
     <PackageReference Include="StackExchange.Redis" Version="2.10.1" />
@@ -32,6 +33,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Maliev.ContactService.Data\Maliev.ContactService.Data.csproj" />
+    <ProjectReference Include="..\..\Maliev.Aspire\Maliev.Aspire.ServiceDefaults\Maliev.Aspire.ServiceDefaults.csproj" />
   </ItemGroup>
 
 </Project>
