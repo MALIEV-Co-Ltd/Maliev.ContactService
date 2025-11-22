@@ -20,6 +20,9 @@ jobs:
 
       - name: Restore dependencies
         run: dotnet restore Maliev.ContactService.sln
+        env:
+          NUGET_USERNAME: ${{ github.actor }}
+          NUGET_PASSWORD: ${{ secrets.GITOPS_PAT }}
 
       - name: Build
         run: dotnet build Maliev.ContactService.sln --no-restore
@@ -42,7 +45,10 @@ jobs:
         run: |
           gcloud auth configure-docker asia-southeast1-docker.pkg.dev
           export RELEASE_VERSION=$(echo ${{ github.ref }} | sed -e 's,.*/v,,g')
-          docker build -t asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-staging/maliev-contact-service:$RELEASE_VERSION -f Maliev.ContactService.Api/Dockerfile .
+          NUGET_USERNAME=${{ github.actor }} NUGET_PASSWORD=${{ secrets.GITOPS_PAT }} docker build \
+            --secret id=nuget_username,env=NUGET_USERNAME \
+            --secret id=nuget_password,env=NUGET_PASSWORD \
+            -t asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-staging/maliev-contact-service:$RELEASE_VERSION -f Maliev.ContactService.Api/Dockerfile .
           docker push asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-staging/maliev-contact-service:$RELEASE_VERSION
 
       - name: Checkout maliev-gitops repository

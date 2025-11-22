@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.4
 # See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
 
 # This stage is used when running from VS in fast mode (Default for Debug configuration)
@@ -13,7 +14,11 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["Maliev.ContactService.Api/Maliev.ContactService.Api.csproj", "Maliev.ContactService.Api/"]
 COPY ["Maliev.ContactService.Data/Maliev.ContactService.Data.csproj", "Maliev.ContactService.Data/"]
-RUN dotnet restore "./Maliev.ContactService.Api/Maliev.ContactService.Api.csproj"
+RUN --mount=type=secret,id=nuget_username \
+    --mount=type=secret,id=nuget_password \
+    NUGET_USERNAME=$(cat /run/secrets/nuget_username) \
+    NUGET_PASSWORD=$(cat /run/secrets/nuget_password) \
+    dotnet restore "./Maliev.ContactService.Api/Maliev.ContactService.Api.csproj"
 COPY . .
 WORKDIR "/src/Maliev.ContactService.Api"
 RUN dotnet build "./Maliev.ContactService.Api.csproj" -c $BUILD_CONFIGURATION -o /app/build
