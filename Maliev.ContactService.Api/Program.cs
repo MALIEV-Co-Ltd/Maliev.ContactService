@@ -121,90 +121,6 @@ try
     // Add controllers
     builder.Services.AddControllers();
 
-    // Add FluentValidation
-    builder.Services.AddValidatorsFromAssemblyContaining<Program>();
-
-    // T039: Configure FormOptions for multipart body length limit (250MB)
-    builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
-    {
-        options.MultipartBodyLengthLimit = 262144000; // 250MB in bytes
-    });
-
-    // Configure Contact DbContext
-    // In Testing/RateLimitTesting environment, skip DbContext if using Testcontainers
-    if (builder.Environment.IsEnvironment("Testing") || builder.Environment.IsEnvironment("RateLimitTesting"))
-    {
-        // Skip DbContext configuration if using Testcontainers
-        // Testcontainers tests will configure DbContext in ConfigureWebHost
-        var useTestcontainers = builder.Configuration.GetValue<bool>("UseTestcontainers");
-        if (!useTestcontainers)
-        {
-            builder.Services.AddDbContext<ContactDbContext>(options =>
-                options.UseInMemoryDatabase("TestDb"));
-        }
-    }
-    else
-    {
-        builder.Services.AddDbContext<ContactDbContext>(options =>
-        {
-            options.UseNpgsql(builder.Configuration.GetConnectionString("ContactDbContext"));
-        });
-    }
-
-    // Configure memory cache (simple configuration per CLAUDE.md standards)
-    builder.Services.AddMemoryCache();
-
-    // Configure rate limiting (skip in Testing environment)
-    if (!builder.Environment.IsEnvironment("Testing"))
-    {
-        builder.Services.AddRateLimiter(options =>
-        {
-            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-
-            var rateLimitingConfig = builder.Configuration.GetSection("RateLimiting");
-            var fixedWindowOptions = rateLimitingConfig.GetSection("FixedWindow").Get<FixedWindowRateLimiterOptions>();
-            var globalFixedWindowOptions = rateLimitingConfig.GetSection("GlobalFixedWindow").Get<FixedWindowRateLimiterOptions>();
-
-            if (globalFixedWindowOptions != null)
-            {
-                options.AddPolicy("GlobalPolicy", context =>
-                    RateLimitPartition.GetFixedWindowLimiter(
-                        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                        factory: _ => globalFixedWindowOptions));
-            }
-
-            if (fixedWindowOptions != null)
-            {
-                options.AddPolicy("ContactPolicy", context =>
-                    RateLimitPartition.GetFixedWindowLimiter(
-                        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                        factory: _ => fixedWindowOptions));
-            }
-        });
-    }
-
-    // Configure UploadService options
-    builder.Services.Configure<UploadServiceOptions>(builder.Configuration.GetSection(UploadServiceOptions.SectionName));
-
-    // Configure development fallbacks for UploadService
-    if (builder.Environment.IsDevelopment())
-    {
-        builder.Services.Configure<UploadServiceOptions>(options =>
-        {
-            options.BaseUrl = "http://localhost:8080";
-            options.TimeoutInSeconds = 30;
-        });
-    }
-    else
-    {
-        builder.Services.AddOptions<UploadServiceOptions>()
-            .Bind(builder.Configuration.GetSection(UploadServiceOptions.SectionName))
-            .ValidateDataAnnotations();
-    }
-
-    // Configure HTTP client for UploadService (skip in Testing - tests will provide mock)
-    builder.Services.AddValidatorsFromAssemblyContaining<Program>();
-
     // T039: Configure FormOptions for multipart body length limit (250MB)
     builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
     {
@@ -291,8 +207,7 @@ try
             var uploadServiceOptions = serviceProvider.GetRequiredService<IOptions<UploadServiceOptions>>().Value;
             client.BaseAddress = new Uri(uploadServiceOptions.BaseUrl);
             client.Timeout = TimeSpan.FromSeconds(uploadServiceOptions.TimeoutInSeconds);
-        })
-        .AddStandardResilienceHandler();
+        });
     }
 
     // Configure CountryService options
@@ -311,6 +226,230 @@ try
         });
     }
 
+    // Configure HTTP client for CountryService (skip in Testing - tests will provide mock)
+    // Note: Polly retry/circuit breaker policies would be added here if Polly package is installed
+    // For now, relying on HttpClient timeout configured in CountryServiceClient
+    if (!builder.Environment.IsEnvironment("Testing"))
+    {
+        builder.Services.AddHttpClient<ICountryServiceClient, CountryServiceClient>();
+    }
+
+    // Register services
+    builder.Services.AddScoped<IContactService, ContactService>();
+
+    // Configure CORS - Secure HTTPS-only policy
+    builder.Services.AddCors(options =>
+    {
+        options.AddDefaultPolicy(
+            policy =>
+            {
+                // Production: HTTPS-only origins
+                if (builder.Environment.IsProduction())
+                {
+                    policy.WithOrigins(
+                        "https://maliev.com",
+                        "https://www.maliev.com")
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .AllowCredentials(); // Enable credentials for authenticated requests
+                }
+                // Staging: HTTPS-only for staging domain
+                else if (builder.Environment.IsStaging())
+                {
+                    policy.WithOrigins(
+                        "https://staging.maliev.com",
+                        "https://maliev-staging.web.app")
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .AllowCredentials();
+                }
+                // Development: Allow localhost with both HTTP and HTTPS
+                else if (builder.Environment.IsDevelopment())
+                {
+                    policy.WithOrigins(
+                        "https://localhost:3000",
+                        "https://localhost:3001",
+                        "http://localhost:3000",
+                        "http://localhost:3001",
+                        "https://maliev.com",
+                        "https://www.maliev.com")
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .AllowCredentials();
+                }
+                // Default: Strict HTTPS-only
+                else
+                {
+                    policy.WithOrigins("https://maliev.com")
+                    .AllowAnyHeader()
+                    .AllowAnyMethod();
+                }
+            });
+
+        // Add a named policy for API-only access (more restrictive)
+        options.AddPolicy("ApiOnly", policy =>
+        {
+            policy.WithOrigins("https://maliev.com", "https://www.maliev.com")
+                .WithHeaders("Content-Type", "Authorization", "X-API-Key")
+                .WithMethods("GET", "POST", "PUT", "DELETE")
+                .AllowCredentials();
+        });
+    });
+
+    // Configure JWT Authentication with RSA public key validation (skip in Testing environment)
+    if (!builder.Environment.IsEnvironment("Testing"))
+    {
+        var jwtSection = builder.Configuration.GetSection(JwtOptions.SectionName);
+        if (jwtSection.Exists())
+        {
+            builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                .AddJwtBearer(options =>
+                {
+                    var jwtOptions = new JwtOptions
+                    {
+                        Issuer = "default-issuer",
+                        Audience = "default-audience",
+                        PublicKey = "default-key"
+                    };
+                    jwtSection.Bind(jwtOptions);
+
+                    // Use RSA public key validation from shared config (maliev-shared-secrets)
+                    var publicKeyBytes = Convert.FromBase64String(jwtOptions.PublicKey);
+                    var publicKeyPem = Encoding.UTF8.GetString(publicKeyBytes);
+
+                    // Import RSA public key from PEM format
+                    var rsa = System.Security.Cryptography.RSA.Create();
+                    rsa.ImportFromPem(publicKeyPem);
+
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        ValidateIssuer = true,
+                        ValidateAudience = true,
+                        ValidateLifetime = true,
+                        ValidateIssuerSigningKey = true,
+                        ValidIssuer = jwtOptions.Issuer,
+                        ValidAudience = jwtOptions.Audience,
+                        IssuerSigningKey = new RsaSecurityKey(rsa)
+                    };
+
+                    // Enhanced security options
+                    options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+                    options.SaveToken = false;
+                    options.IncludeErrorDetails = builder.Environment.IsDevelopment();
+
+                    // Event handlers for security logging
+                    options.Events = new JwtBearerEvents
+                    {
+                        OnAuthenticationFailed = context =>
+                        {
+                            Log.Warning("JWT Authentication failed: {Error}", context.Exception.Message);
+                            return Task.CompletedTask;
+                        },
+                        OnTokenValidated = context =>
+                        {
+                            Log.Debug("JWT Token validated for {User}", context.Principal?.Identity?.Name ?? "Unknown");
+                            return Task.CompletedTask;
+                        }
+                    };
+                });
+
+            Log.Information("JWT Authentication configured with RSA public key validation");
+        }
+        else
+        {
+            Log.Warning("JWT configuration not found - API will start but authentication will not work. Configure JWT secrets for full functionality.");
+        }
+    }
+
+    builder.Services.AddAuthorization(options =>
+    {
+        options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
+        options.AddPolicy("UserOnly", policy => policy.RequireRole("User"));
+    });
+
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders =
+            ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        
+        // Configure trusted proxies and networks based on environment
+        if (builder.Environment.IsProduction())
+        {
+            // In production, trust internal Kubernetes networks
+            // These are common Kubernetes service network ranges
+            options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse("10.0.0.0/8"));
+            options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse("172.16.0.0/12"));
+            options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse("192.168.0.0/16"));
+
+            // Trust localhost for health checks and internal services
+            options.KnownProxies.Add(System.Net.IPAddress.Loopback);
+            options.KnownProxies.Add(System.Net.IPAddress.IPv6Loopback);
+        }
+        else if (builder.Environment.IsStaging())
+        {
+            // In staging, trust internal networks
+            options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse("10.0.0.0/8"));
+            options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse("172.16.0.0/12"));
+            options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse("192.168.0.0/16"));
+
+            // Trust localhost for health checks and internal services
+            options.KnownProxies.Add(System.Net.IPAddress.Loopback);
+            options.KnownProxies.Add(System.Net.IPAddress.IPv6Loopback);
+        }
+        else
+        {
+            // In development/testing, trust localhost only for security
+            options.KnownProxies.Add(System.Net.IPAddress.Loopback);
+            options.KnownProxies.Add(System.Net.IPAddress.IPv6Loopback);
+        }
+    });
+
+    var healthChecksBuilder = builder.Services.AddHealthChecks()
+        .AddCheck<DatabaseHealthCheck>("Database Health Check", tags: new[] { "readiness" });
+
+    // Add Redis health check if enabled
+    if (redisEnabled && !string.IsNullOrEmpty(redisConnectionString))
+    {
+        healthChecksBuilder.AddRedis(redisConnectionString, "redis", tags: new[] { "readiness" });
+    }
+
+    // Add service defaults for .NET Aspire
+    builder.AddServiceDefaults();
+
+    var app = builder.Build();
+
+    // Configure base path for all routes
+    app.UsePathBase("/contacts");
+
+    app.UseForwardedHeaders();
+    app.UseHttpsRedirection(); // Move HTTPS redirection to be called early
+
+    // Configure the HTTP request pipeline
+    // Enable Scalar API Documentation in non-production environments
+    // For dev cluster: set ASPNETCORE_ENVIRONMENT=Development in deployment config
+    if (!app.Environment.IsProduction())
+    {
+        app.MapOpenApi("/contacts/openapi/{documentName}.json");
+        app.MapScalarApiReference("/contacts/scalar/v1", options =>
+        {
+            options
+                .WithTitle("Maliev Contact Service API")
+                .WithTheme(Scalar.AspNetCore.ScalarTheme.Saturn)
+                .WithDefaultHttpClient(Scalar.AspNetCore.ScalarTarget.CSharp, Scalar.AspNetCore.ScalarClient.HttpClient)
+                .WithOpenApiRoutePattern("/contacts/openapi/{documentName}.json");
+        });
+
+        Log.Information("Scalar API documentation enabled for {Environment} environment at /contacts/scalar/v1", app.Environment.EnvironmentName);
+    }
+    else
+    {
+        Log.Information("API documentation disabled in production environment for security");
+    }
+
+    app.UseMiddleware<ExceptionHandlingMiddleware>();
+    // app.UseHttpsRedirection(); // Remove from here - moved above
+
+    // MANDATORY: Prometheus metrics
     if (!app.Environment.IsEnvironment("Testing"))
     {
         app.UseRateLimiter();
