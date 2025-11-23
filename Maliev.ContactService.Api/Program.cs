@@ -311,18 +311,6 @@ try
         });
     }
 
-    // Configure HTTP client for CountryService (skip in Testing - tests will provide mock)
-    // Note: Polly retry/circuit breaker policies would be added here if Polly package is installed
-    // For now, relying on HttpClient timeout configured in CountryServiceClient
-    if (!builder.Environment.IsEnvironment("Testing"))
-    {
-        builder.Services.AddHttpClient<ICountryServiceClient, CountryServiceClient>()
-    }
-
-    app.UseMiddleware<ExceptionHandlingMiddleware>();
-    // app.UseHttpsRedirection(); // Remove from here - moved above
-
-    // MANDATORY: Prometheus metrics
     if (!app.Environment.IsEnvironment("Testing"))
     {
         app.UseRateLimiter();
