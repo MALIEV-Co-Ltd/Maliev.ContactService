@@ -2,43 +2,81 @@ using System.ComponentModel.DataAnnotations;
 using Maliev.ContactService.Data.Models;
 
 namespace Maliev.ContactService.Api.Models;
+/// <summary>
+/// Request model for createcontactmessage
+/// </summary>
 
 public class CreateContactMessageRequest : IValidatableObject
 {
+    /// <summary>
+    /// Gets or sets the full name of the person submitting the contact message.
+    /// </summary>
     [Required]
     [StringLength(200, MinimumLength = 1)]
     public required string FullName { get; set; }
 
+    /// <summary>
+    /// Gets or sets the email address of the person submitting the contact message.
+    /// </summary>
     [Required]
     [EmailAddress]
     [StringLength(254)]
     public required string Email { get; set; }
 
+    /// <summary>
+    /// Gets or sets the phone number of the person submitting the contact message.
+    /// </summary>
     [StringLength(20)]
     public string? PhoneNumber { get; set; }
 
+    /// <summary>
+    /// Gets or sets the company name of the person submitting the contact message.
+    /// </summary>
     [StringLength(200)]
     public string? Company { get; set; }
 
+    /// <summary>
+    /// Gets or sets the subject of the contact message.
+    /// </summary>
     [Required]
     [StringLength(500, MinimumLength = 1)]
     public required string Subject { get; set; }
 
+    /// <summary>
+    /// Gets or sets the message content.
+    /// </summary>
     [Required]
     [StringLength(10000, MinimumLength = 1)]
     public required string Message { get; set; }
 
+    /// <summary>
+    /// Gets or sets the country identifier associated with the contact message.
+    /// </summary>
     [Required]
     [Range(1, 999)]
     public int CountryId { get; set; }
 
+    /// <summary>
+    /// Gets or sets the type of contact inquiry.
+    /// </summary>
     [Required]
     public ContactType ContactType { get; set; } = ContactType.General;
 
+    /// <summary>
+    /// Gets or sets the priority level of the contact message.
+    /// </summary>
     public Priority Priority { get; set; } = Priority.Medium;
 
+    /// <summary>
+    /// Gets or sets the list of files to attach to the contact message.
+    /// </summary>
     public List<CreateContactFileRequest> Files { get; set; } = new();
 
+    /// <summary>
+    /// Validates the contact message request according to business rules.
+    /// </summary>
+    /// <param name="validationContext">The validation context.</param>
+    /// <returns>A collection of validation results.</returns>
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         // FR-013: Reject Quotation contact type
@@ -70,16 +108,28 @@ public class CreateContactMessageRequest : IValidatableObject
         }
     }
 }
+/// <summary>
+/// Request model for createcontactfile
+/// </summary>
 
 public class CreateContactFileRequest
 {
+    /// <summary>
+    /// Gets or sets the name of the file.
+    /// </summary>
     [Required]
     [StringLength(255)]
     public required string FileName { get; set; }
 
+    /// <summary>
+    /// Gets or sets the binary content of the file.
+    /// </summary>
     [Required]
     public required byte[] FileContent { get; set; }
 
+    /// <summary>
+    /// Gets or sets the MIME content type of the file.
+    /// </summary>
     [StringLength(100)]
     public string? ContentType { get; set; }
 }

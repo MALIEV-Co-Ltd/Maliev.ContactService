@@ -1,6 +1,9 @@
 using Maliev.ContactService.Api.Exceptions;
 
 namespace Maliev.ContactService.Api.Services;
+/// <summary>
+/// Client interface for CountryService service
+/// </summary>
 
 public interface ICountryServiceClient
 {

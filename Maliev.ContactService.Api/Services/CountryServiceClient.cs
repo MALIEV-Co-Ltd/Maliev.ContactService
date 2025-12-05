@@ -4,12 +4,18 @@ using Microsoft.Extensions.Options;
 using System.Net;
 
 namespace Maliev.ContactService.Api.Services;
+/// <summary>
+/// Represents a CountryServiceClient
+/// </summary>
 
 public class CountryServiceClient : ICountryServiceClient
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<CountryServiceClient> _logger;
     private readonly CountryServiceOptions _options;
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CountryServiceClient"/> class.
+    /// </summary>
 
     public CountryServiceClient(
         HttpClient httpClient,
@@ -24,6 +30,12 @@ public class CountryServiceClient : ICountryServiceClient
         _httpClient.BaseAddress = new Uri(_options.BaseUrl);
         _httpClient.Timeout = TimeSpan.FromSeconds(_options.TimeoutInSeconds);
     }
+    /// <summary>
+    /// Validates  C o u n t r y E x i s t s asynchronously
+    /// </summary>
+    /// <param name="countryId">The countryId identifier</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>A task representing the asynchronous operation</returns>
 
     public async Task<bool> ValidateCountryExistsAsync(int countryId, CancellationToken cancellationToken = default)
     {
@@ -37,7 +49,7 @@ public class CountryServiceClient : ICountryServiceClient
         {
             _logger.LogInformation("Validating country ID {CountryId} via Country Service", countryId);
 
-            var response = await _httpClient.GetAsync($"/countries/v1/{countryId}", cancellationToken);
+            var response = await _httpClient.GetAsync($"/countries/v1/countries/{countryId}", cancellationToken);
 
             if (response.StatusCode == HttpStatusCode.NotFound)
             {

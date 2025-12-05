@@ -8,8 +8,11 @@ using Microsoft.AspNetCore.RateLimiting;
 
 namespace Maliev.ContactService.Api.Controllers;
 
+/// <summary>
+/// API controller for managing contact messages.
+/// </summary>
 [ApiController]
-[Route("v{version:apiVersion}/contacts")]
+[Route("contacts/v{version:apiVersion}/contacts")]
 [ApiVersion("1.0")]
 public class ContactsController : ControllerBase
 {
@@ -17,6 +20,12 @@ public class ContactsController : ControllerBase
     private readonly IUploadServiceClient _uploadService;
     private readonly ILogger<ContactsController> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ContactsController"/> class.
+    /// </summary>
+    /// <param name="contactService">The contact service.</param>
+    /// <param name="uploadService">The upload service client.</param>
+    /// <param name="logger">The logger instance.</param>
     public ContactsController(IContactService contactService, IUploadServiceClient uploadService, ILogger<ContactsController> logger)
     {
         _contactService = contactService;

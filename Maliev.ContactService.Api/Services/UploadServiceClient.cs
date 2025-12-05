@@ -2,13 +2,20 @@ using System.Text;
 using System.Text.Json;
 
 namespace Maliev.ContactService.Api.Services;
+/// <summary>
+/// Represents a UploadServiceClient
+/// </summary>
 
 public class UploadServiceClient : IUploadServiceClient
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<UploadServiceClient> _logger;
     private readonly JsonSerializerOptions _jsonOptions;
-
+    /// <summary>
+    /// Initializes a new instance of the <see cref="UploadServiceClient"/> class.
+    /// </summary>
+    /// <param name="httpClient">The HTTP client for making requests to the upload service.</param>
+    /// <param name="logger">The logger instance.</param>
     public UploadServiceClient(HttpClient httpClient, ILogger<UploadServiceClient> logger)
     {
         _httpClient = httpClient;
@@ -18,7 +25,14 @@ public class UploadServiceClient : IUploadServiceClient
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         };
     }
-
+    /// <summary>
+    /// Uploads a file to the upload service.
+    /// </summary>
+    /// <param name="objectName">The object name for the file in storage.</param>
+    /// <param name="fileContent">The binary content of the file.</param>
+    /// <param name="contentType">The MIME content type of the file.</param>
+    /// <param name="fileName">The original file name.</param>
+    /// <returns>The upload response containing file metadata.</returns>
     public async Task<UploadResponse> UploadFileAsync(string objectName, byte[] fileContent, string contentType, string fileName)
     {
         try
@@ -52,6 +66,11 @@ public class UploadServiceClient : IUploadServiceClient
             throw;
         }
     }
+    /// <summary>
+    /// Deletes  F i l e asynchronously
+    /// </summary>
+    /// <param name="uploadServiceFileId">The uploadServiceFileId identifier</param>
+    /// <returns>A task representing the asynchronous operation</returns>
 
     public async Task<bool> DeleteFileAsync(string uploadServiceFileId)
     {
@@ -80,6 +99,11 @@ public class UploadServiceClient : IUploadServiceClient
             return false;
         }
     }
+    /// <summary>
+    /// Performs  D o w n l o a d F i l e asynchronously
+    /// </summary>
+    /// <param name="uploadServiceFileId">The uploadServiceFileId identifier</param>
+    /// <returns>A task representing the asynchronous operation</returns>
 
     public async Task<FileDownloadResponse> DownloadFileAsync(string uploadServiceFileId)
     {

@@ -7,6 +7,9 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Primitives;
 
 namespace Maliev.ContactService.Api.Services;
+/// <summary>
+/// Service for Contact operations
+/// </summary>
 
 public class ContactService : IContactService
 {
@@ -17,7 +20,14 @@ public class ContactService : IContactService
     private readonly ILogger<ContactService> _logger;
     private static readonly TimeSpan CacheExpiry = TimeSpan.FromMinutes(5);
     private static CancellationTokenSource _cacheCts = new CancellationTokenSource();
-
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ContactService"/> class.
+    /// </summary>
+    /// <param name="context">The database context.</param>
+    /// <param name="cache">The memory cache instance.</param>
+    /// <param name="uploadService">The upload service client.</param>
+    /// <param name="countryService">The country service client.</param>
+    /// <param name="logger">The logger instance.</param>
     public ContactService(
         ContactDbContext context,
         IMemoryCache cache,
@@ -31,7 +41,7 @@ public class ContactService : IContactService
         _countryService = countryService;
         _logger = logger;
     }
-
+    /// <inheritdoc/>
     public async Task<ContactMessageDto> CreateContactMessageAsync(CreateContactMessageRequest request)
     {
         if (request == null)
@@ -63,130 +73,130 @@ public class ContactService : IContactService
 
         _logger.LogInformation("Creating contact inquiry for {Email} with country ID {CountryId}", request.Email, request.CountryId);
 
-        // Check if the database provider supports transactions
-        var isTransactionSupported = _context.Database.ProviderName != "Microsoft.EntityFrameworkCore.InMemory";
-        var transaction = isTransactionSupported ? await _context.Database.BeginTransactionAsync() : null;
+        // Use execution strategy for retry-compatible transaction handling
+        var strategy = _context.Database.CreateExecutionStrategy();
 
-        try
+        return await strategy.ExecuteAsync(async () =>
         {
-            var contactMessage = new ContactMessage
-            {
-                FullName = request.FullName,
-                Email = request.Email,
-                PhoneNumber = request.PhoneNumber,
-                Company = request.Company,
-                Subject = request.Subject,
-                Message = request.Message,
-                CountryId = request.CountryId,
-                ContactType = request.ContactType,
-                Priority = request.Priority,
-                Status = ContactStatus.New,
-                CreatedAt = DateTimeOffset.UtcNow,
-                UpdatedAt = DateTimeOffset.UtcNow
-            };
+            // Check if the database provider supports transactions
+            var isTransactionSupported = _context.Database.ProviderName != "Microsoft.EntityFrameworkCore.InMemory";
 
-            _context.ContactMessages.Add(contactMessage);
-            await _context.SaveChangesAsync();
-
-            // Add files if any
-            if (request.Files.Any())
+            using var transaction = isTransactionSupported ? await _context.Database.BeginTransactionAsync() : null;
+            try
             {
-                foreach (var fileRequest in request.Files)
+                var contactMessage = new ContactMessage
                 {
-                    try
+                    FullName = request.FullName,
+                    Email = request.Email,
+                    PhoneNumber = request.PhoneNumber,
+                    Company = request.Company,
+                    Subject = request.Subject,
+                    Message = request.Message,
+                    CountryId = request.CountryId,
+                    ContactType = request.ContactType,
+                    Priority = request.Priority,
+                    Status = ContactStatus.New,
+                    CreatedAt = DateTimeOffset.UtcNow,
+                    UpdatedAt = DateTimeOffset.UtcNow
+                };
+
+                _context.ContactMessages.Add(contactMessage);
+                await _context.SaveChangesAsync();
+
+                // Add files if any
+                if (request.Files.Any())
+                {
+                    foreach (var fileRequest in request.Files)
                     {
-                        // Generate object name: contacts/{contactId}/{timestamp}_{fileName}
-                        var objectName = $"contacts/{contactMessage.Id}/{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}_{fileRequest.FileName}";
-
-                        // Upload file to UploadService
-                        var uploadResponse = await _uploadService.UploadFileAsync(
-                            objectName,
-                            fileRequest.FileContent,
-                            fileRequest.ContentType ?? "application/octet-stream",
-                            fileRequest.FileName);
-
-                        // Store file metadata in database
-                        var contactFile = new ContactFile
+                        try
                         {
-                            ContactMessageId = contactMessage.Id,
-                            FileName = fileRequest.FileName,
-                            ObjectName = objectName,
-                            FileSize = uploadResponse.FileSize,
-                            ContentType = fileRequest.ContentType ?? "application/octet-stream",
-                            UploadServiceFileId = uploadResponse.FileId,
-                            CreatedAt = DateTimeOffset.UtcNow
-                        };
+                            // Generate object name: contacts/{contactId}/{timestamp}_{fileName}
+                            var objectName = $"contacts/{contactMessage.Id}/{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}_{fileRequest.FileName}";
 
-                        _context.ContactFiles.Add(contactFile);
-                        _logger.LogInformation("File uploaded for contact {ContactId}: {FileName} -> {FileId}",
-                            contactMessage.Id, fileRequest.FileName, uploadResponse.FileId);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Failed to upload file {FileName} for contact {ContactId}",
-                            fileRequest.FileName, contactMessage.Id);
+                            // Upload file to UploadService
+                            var uploadResponse = await _uploadService.UploadFileAsync(
+                                objectName,
+                                fileRequest.FileContent,
+                                fileRequest.ContentType ?? "application/octet-stream",
+                                fileRequest.FileName);
 
-                        // Continue with other files - don't fail the entire contact creation
-                        // You might want to store failed uploads with a different status
+                            // Store file metadata in database
+                            var contactFile = new ContactFile
+                            {
+                                ContactMessageId = contactMessage.Id,
+                                FileName = fileRequest.FileName,
+                                ObjectName = objectName,
+                                FileSize = uploadResponse.FileSize,
+                                ContentType = fileRequest.ContentType ?? "application/octet-stream",
+                                UploadServiceFileId = uploadResponse.FileId,
+                                CreatedAt = DateTimeOffset.UtcNow
+                            };
+
+                            _context.ContactFiles.Add(contactFile);
+                            _logger.LogInformation("File uploaded for contact {ContactId}: {FileName} -> {FileId}",
+                                contactMessage.Id, fileRequest.FileName, uploadResponse.FileId);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Failed to upload file {FileName} for contact {ContactId}",
+                                fileRequest.FileName, contactMessage.Id);
+
+                            // Continue with other files - don't fail the entire contact creation
+                            // You might want to store failed uploads with a different status
+                        }
                     }
+
+                    await _context.SaveChangesAsync();
                 }
 
-                await _context.SaveChangesAsync();
-            }
+                if (transaction != null)
+                {
+                    await transaction.CommitAsync();
+                }
 
-            if (transaction != null)
-            {
-                await transaction.CommitAsync();
-            }
+                // FR-026: Audit logging for successful inquiry
+                _logger.LogInformation(
+                    "Contact inquiry created successfully. ID={ContactId}, Email={Email}, CountryId={CountryId}, Type={ContactType}, FileCount={FileCount}",
+                    contactMessage.Id, contactMessage.Email, contactMessage.CountryId, contactMessage.ContactType, request.Files.Count);
 
-            // FR-026: Audit logging for successful inquiry
-            _logger.LogInformation(
-                "Contact inquiry created successfully. ID={ContactId}, Email={Email}, CountryId={CountryId}, Type={ContactType}, FileCount={FileCount}",
-                contactMessage.Id, contactMessage.Email, contactMessage.CountryId, contactMessage.ContactType, request.Files.Count);
-
-            return await GetContactMessageByIdAsync(contactMessage.Id) ?? throw new InvalidOperationException("Failed to retrieve created contact message");
-        }
-        catch (DuplicateInquiryException ex)
-        {
-            // FR-026: Audit logging for duplicate inquiry attempt
-            _logger.LogWarning("Duplicate inquiry attempt blocked. Email={Email}, Reason={Reason}", request.Email, ex.Message);
-            if (transaction != null)
-            {
-                await transaction.RollbackAsync();
+                return await GetContactMessageByIdAsync(contactMessage.Id) ?? throw new InvalidOperationException("Failed to retrieve created contact message");
             }
-            throw;
-        }
-        catch (CountryServiceException ex)
-        {
-            // FR-026: Audit logging for Country Service failure
-            _logger.LogError(ex, "Country Service unavailable during inquiry creation. Email={Email}, CountryId={CountryId}",
-                request.Email, request.CountryId);
-            if (transaction != null)
+            catch (DuplicateInquiryException ex)
             {
-                await transaction.RollbackAsync();
+                // FR-026: Audit logging for duplicate inquiry attempt
+                _logger.LogWarning("Duplicate inquiry attempt blocked. Email={Email}, Reason={Reason}", request.Email, ex.Message);
+                if (transaction != null)
+                {
+                    await transaction.RollbackAsync();
+                }
+                throw;
             }
-            throw;
-        }
-        catch (Exception ex)
-        {
-            // FR-026: Audit logging for failed inquiry
-            _logger.LogError(ex, "Failed to create contact inquiry. Email={Email}, CountryId={CountryId}, Error={Error}",
-                request.Email, request.CountryId, ex.Message);
-            if (transaction != null)
+            catch (CountryServiceException ex)
             {
-                await transaction.RollbackAsync();
+                // FR-026: Audit logging for Country Service failure
+                _logger.LogError(ex, "Country Service unavailable during inquiry creation. Email={Email}, CountryId={CountryId}",
+                    request.Email, request.CountryId);
+                if (transaction != null)
+                {
+                    await transaction.RollbackAsync();
+                }
+                throw;
             }
-            throw; // Re-throw the exception to be handled by the global exception handler
-        }
-        finally
-        {
-            if (transaction != null)
+            catch (Exception ex)
             {
-                await transaction.DisposeAsync();
+                // FR-026: Audit logging for failed inquiry
+                _logger.LogError(ex, "Failed to create contact inquiry. Email={Email}, CountryId={CountryId}, Error={Error}",
+                    request.Email, request.CountryId, ex.Message);
+                if (transaction != null)
+                {
+                    await transaction.RollbackAsync();
+                }
+                throw; // Re-throw the exception to be handled by the global exception handler
             }
-        }
+        });
     }
 
+    /// <inheritdoc/>
     public async Task<ContactMessageDto?> GetContactMessageByIdAsync(int id)
     {
         var cacheKey = $"contact_message_{id}";
@@ -212,6 +222,7 @@ public class ContactService : IContactService
         return contactDto;
     }
 
+    /// <inheritdoc/>
     public async Task<IEnumerable<ContactMessageDto>> GetContactMessagesAsync(
         int page = 1,
         int pageSize = 20,
@@ -267,7 +278,7 @@ public class ContactService : IContactService
 
         return result;
     }
-
+    /// <inheritdoc/>
     public async Task<ContactMessageDto> UpdateContactStatusAsync(int id, UpdateContactStatusRequest request)
     {
         var contact = await _context.ContactMessages.FindAsync(id);
@@ -315,7 +326,7 @@ public class ContactService : IContactService
 
         return await GetContactMessageByIdAsync(id) ?? throw new InvalidOperationException("Failed to retrieve updated contact message");
     }
-
+    /// <inheritdoc/>
     public async Task DeleteContactMessageAsync(int id)
     {
         var contact = await _context.ContactMessages.FindAsync(id);
@@ -331,6 +342,7 @@ public class ContactService : IContactService
         _logger.LogInformation("Deleted contact message {ContactId}", id);
     }
 
+    /// <inheritdoc/>
     public async Task<IEnumerable<ContactFileDto>> GetContactFilesAsync(int contactId)
     {
         var files = await _context.ContactFiles
@@ -349,6 +361,7 @@ public class ContactService : IContactService
         });
     }
 
+    /// <inheritdoc/>
     public async Task<ContactFileDto?> GetContactFileByIdAsync(int contactId, int fileId)
     {
         var file = await _context.ContactFiles
@@ -367,7 +380,7 @@ public class ContactService : IContactService
 
         return file;
     }
-
+    /// <inheritdoc/>
     public async Task DeleteContactFileAsync(int contactId, int fileId)
     {
         var file = await _context.ContactFiles
