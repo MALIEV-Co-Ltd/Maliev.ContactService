@@ -14,11 +14,12 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["Maliev.ContactService.Api/Maliev.ContactService.Api.csproj", "Maliev.ContactService.Api/"]
 COPY ["Maliev.ContactService.Data/Maliev.ContactService.Data.csproj", "Maliev.ContactService.Data/"]
+COPY ["nuget.config", "."]
 RUN --mount=type=secret,id=nuget_username \
-    --mount=type=secret,id=nuget_password \
-    NUGET_USERNAME=$(cat /run/secrets/nuget_username) \
-    NUGET_PASSWORD=$(cat /run/secrets/nuget_password) \
-    dotnet restore "./Maliev.ContactService.Api/Maliev.ContactService.Api.csproj"
+  --mount=type=secret,id=nuget_password \
+  NUGET_USERNAME=$(cat /run/secrets/nuget_username) \
+  NUGET_PASSWORD=$(cat /run/secrets/nuget_password) \
+  dotnet restore "./Maliev.ContactService.Api/Maliev.ContactService.Api.csproj"
 COPY . .
 WORKDIR "/src/Maliev.ContactService.Api"
 RUN dotnet build "./Maliev.ContactService.Api.csproj" -c $BUILD_CONFIGURATION -o /app/build
