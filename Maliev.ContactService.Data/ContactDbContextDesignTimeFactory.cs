@@ -4,8 +4,16 @@ using Microsoft.EntityFrameworkCore.Design;
 
 namespace Maliev.ContactService.Data;
 
+/// <summary>
+/// Factory for creating <see cref="ContactDbContext"/> instances at design time for migrations and tooling.
+/// </summary>
 public class ContactDbContextDesignTimeFactory : IDesignTimeDbContextFactory<ContactDbContext>
 {
+    /// <summary>
+    /// Creates a new instance of <see cref="ContactDbContext"/> with the configured database connection.
+    /// </summary>
+    /// <param name="args">Command-line arguments passed to the factory.</param>
+    /// <returns>A configured <see cref="ContactDbContext"/> instance.</returns>
     public ContactDbContext CreateDbContext(string[] args)
     {
         var optionsBuilder = new DbContextOptionsBuilder<ContactDbContext>();

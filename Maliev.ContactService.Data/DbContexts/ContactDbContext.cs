@@ -3,21 +3,44 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.ContactService.Data.DbContexts;
 
+/// <summary>
+/// Database context for contact service data.
+/// </summary>
 public class ContactDbContext : DbContext
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ContactDbContext"/> class with the specified options.
+    /// </summary>
+    /// <param name="options">The options to configure the context.</param>
     public ContactDbContext(DbContextOptions<ContactDbContext> options) : base(options)
     {
     }
 
+    /// <summary>
+    /// Gets or sets the DbSet for ContactMessage entities.
+    /// </summary>
     public DbSet<ContactMessage> ContactMessages { get; set; }
+    
+    /// <summary>
+    /// Gets or sets the DbSet for ContactFile entities.
+    /// </summary>
     public DbSet<ContactFile> ContactFiles { get; set; }
 
+    /// <summary>
+    /// Saves all changes made in this context to the database.
+    /// </summary>
+    /// <returns>The number of state entries written to the database.</returns>
     public override int SaveChanges()
     {
         AddTimestamps();
         return base.SaveChanges();
     }
 
+    /// <summary>
+    /// Asynchronously saves all changes made in this context to the database.
+    /// </summary>
+    /// <param name="cancellationToken">A cancellation token to observe while waiting for the task to complete.</param>
+    /// <returns>A task that represents the asynchronous save operation. The task result contains the number of state entries written to the database.</returns>
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         AddTimestamps();
@@ -51,6 +74,10 @@ public class ContactDbContext : DbContext
         }
     }
 
+    /// <summary>
+    /// Configures the schema needed for the contact context.
+    /// </summary>
+    /// <param name="modelBuilder">The builder being used to construct the model for this context.</param>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
