@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using FluentAssertions;
 using Maliev.ContactService.Api.Models;
 using Maliev.ContactService.Data.Models;
 using Microsoft.AspNetCore.Hosting;
@@ -27,13 +26,13 @@ public class ContactsControllerIntegrationTests : IClassFixture<CustomWebApplica
     [Fact]
     public async Task GetContactMessages_Should_Return_Success_With_Proper_Auth()
     {
-        // Act
-        var response = await _client.GetAsync("/v1/contacts");
+        // Act - Use correct route with service prefix: /contacts/v{version}/contacts
+        var response = await _client.GetAsync("/contacts/v1/contacts");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var contacts = await response.Content.ReadFromJsonAsync<IEnumerable<ContactMessageDto>>();
-        contacts.Should().NotBeNull();
+        Assert.NotNull(contacts);
     }
 
     [Fact]
@@ -43,19 +42,19 @@ public class ContactsControllerIntegrationTests : IClassFixture<CustomWebApplica
         var request = new CreateContactMessageRequest
         {
             FullName = "John Doe",
-            Email = "john.integration@example.com",
+            Email = $"john.integration.{Guid.NewGuid():N}@example.com",
             Subject = "Test Subject",
             Message = "Test Message",
             CountryId = 1,
             ContactType = ContactType.General
         };
 
-        // Act
-        var response = await _client.PostAsJsonAsync("/v1/contacts", request);
+        // Act - Use correct route with service prefix: /contacts/v{version}/contacts
+        var response = await _client.PostAsJsonAsync("/contacts/v1/contacts", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var contact = await response.Content.ReadFromJsonAsync<ContactMessageDto>();
-        contact.Should().NotBeNull();
+        Assert.NotNull(contact);
     }
 }

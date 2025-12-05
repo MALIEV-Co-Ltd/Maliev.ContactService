@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Maliev.ContactService.Api.Models;
 using Maliev.ContactService.Api.Services;
 using Maliev.ContactService.Data.DbContexts;
@@ -72,9 +71,9 @@ public class UpdatedAtPropertyTests : IDisposable
         var result = await _contactService.UpdateContactStatusAsync(contact.Id, updateRequest);
 
         // Assert
-        result.Should().NotBeNull();
-        result.Status.Should().Be(ContactStatus.InProgress);
-        result.UpdatedAt.Should().BeAfter(originalUpdatedAt);
+        Assert.NotNull(result);
+        Assert.Equal(ContactStatus.InProgress, result.Status);
+        Assert.True(result.UpdatedAt > originalUpdatedAt);
     }
 
     [Fact]
@@ -94,8 +93,8 @@ public class UpdatedAtPropertyTests : IDisposable
         var result = await _contactService.CreateContactMessageAsync(request);
 
         // Assert
-        result.Should().NotBeNull();
-        result.CreatedAt.Should().BeCloseTo(result.UpdatedAt, TimeSpan.FromSeconds(1));
+        Assert.NotNull(result);
+        Assert.True((result.UpdatedAt - result.CreatedAt).Duration() < TimeSpan.FromSeconds(1));
     }
 
     public void Dispose()

@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Maliev.ContactService.Api.Models;
 using Maliev.ContactService.Data.Models;
 
@@ -20,14 +19,14 @@ public class ModelTests
         };
 
         // Assert
-        request.FullName.Should().Be("Test User");
-        request.Email.Should().Be("test@example.com");
-        request.Subject.Should().Be("Test Subject");
-        request.Message.Should().Be("Test Message");
-        request.ContactType.Should().Be(ContactType.General);
-        request.Priority.Should().Be(Priority.Medium);
-        request.Files.Should().NotBeNull();
-        request.Files.Should().BeEmpty();
+        Assert.Equal("Test User", request.FullName);
+        Assert.Equal("test@example.com", request.Email);
+        Assert.Equal("Test Subject", request.Subject);
+        Assert.Equal("Test Message", request.Message);
+        Assert.Equal(ContactType.General, request.ContactType);
+        Assert.Equal(Priority.Medium, request.Priority);
+        Assert.NotNull(request.Files);
+        Assert.Empty(request.Files);
     }
 
     [Fact]
@@ -43,14 +42,14 @@ public class ModelTests
         };
 
         // Assert
-        contact.ContactType.Should().Be(ContactType.General);
-        contact.Priority.Should().Be(Priority.Medium);
-        contact.Status.Should().Be(ContactStatus.New);
-        contact.Files.Should().NotBeNull();
-        contact.Files.Should().BeEmpty();
-        contact.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
-        contact.UpdatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
-        contact.ResolvedAt.Should().BeNull();
+        Assert.Equal(ContactType.General, contact.ContactType);
+        Assert.Equal(Priority.Medium, contact.Priority);
+        Assert.Equal(ContactStatus.New, contact.Status);
+        Assert.NotNull(contact.Files);
+        Assert.Empty(contact.Files);
+        Assert.True((DateTime.UtcNow - contact.CreatedAt).Duration() < TimeSpan.FromSeconds(5));
+        Assert.True((DateTime.UtcNow - contact.UpdatedAt).Duration() < TimeSpan.FromSeconds(5));
+        Assert.Null(contact.ResolvedAt);
     }
 
     [Fact]
@@ -67,12 +66,12 @@ public class ModelTests
         };
 
         // Assert
-        file.ContactMessageId.Should().Be(1);
-        file.FileName.Should().Be("test.pdf");
-        file.ObjectName.Should().Be("contacts/1/test.pdf");
-        file.ContentType.Should().Be("application/pdf");
-        file.FileSize.Should().BeNull();
-        file.UploadServiceFileId.Should().BeNull();
+        Assert.Equal(1, file.ContactMessageId);
+        Assert.Equal("test.pdf", file.FileName);
+        Assert.Equal("contacts/1/test.pdf", file.ObjectName);
+        Assert.Equal("application/pdf", file.ContentType);
+        Assert.Null(file.FileSize);
+        Assert.Null(file.UploadServiceFileId);
     }
 
     [Fact]
@@ -85,8 +84,8 @@ public class ModelTests
         };
 
         // Assert
-        request.Status.Should().Be(ContactStatus.InProgress);
-        request.Priority.Should().BeNull();
+        Assert.Equal(ContactStatus.InProgress, request.Status);
+        Assert.Null(request.Priority);
     }
 
     [Theory]
@@ -96,7 +95,7 @@ public class ModelTests
     public void ContactType_Enum_Should_Have_Valid_Values(ContactType contactType)
     {
         // Assert
-        Enum.IsDefined(typeof(ContactType), contactType).Should().BeTrue();
+        Assert.True(Enum.IsDefined(typeof(ContactType), contactType));
     }
 
     [Theory]
@@ -107,7 +106,7 @@ public class ModelTests
     public void Priority_Enum_Should_Have_Valid_Values(Priority priority)
     {
         // Assert
-        Enum.IsDefined(typeof(Priority), priority).Should().BeTrue();
+        Assert.True(Enum.IsDefined(typeof(Priority), priority));
     }
 
     [Theory]
@@ -118,6 +117,6 @@ public class ModelTests
     public void ContactStatus_Enum_Should_Have_Valid_Values(ContactStatus status)
     {
         // Assert
-        Enum.IsDefined(typeof(ContactStatus), status).Should().BeTrue();
+        Assert.True(Enum.IsDefined(typeof(ContactStatus), status));
     }
 }

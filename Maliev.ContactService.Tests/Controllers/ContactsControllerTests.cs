@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Maliev.ContactService.Api.Controllers;
 using Maliev.ContactService.Api.Models;
 using Maliev.ContactService.Api.Services;
@@ -60,11 +59,11 @@ public class ContactsControllerTests
         var result = await _controller.CreateContactMessage(request);
 
         // Assert
-        result.Result.Should().BeOfType<CreatedAtActionResult>();
+        Assert.IsType<CreatedAtActionResult>(result.Result);
         var createdResult = result.Result as CreatedAtActionResult;
-        createdResult!.ActionName.Should().Be(nameof(ContactsController.GetContactMessage));
-        createdResult.RouteValues!["id"].Should().Be(1);
-        createdResult.Value.Should().Be(expectedContact);
+        Assert.Equal(nameof(ContactsController.GetContactMessage), createdResult!.ActionName);
+        Assert.Equal(1, createdResult.RouteValues!["id"]);
+        Assert.Equal(expectedContact, createdResult.Value);
     }
 
 
@@ -95,9 +94,9 @@ public class ContactsControllerTests
         var result = await _controller.GetContactMessage(contactId);
 
         // Assert
-        result.Result.Should().BeOfType<OkObjectResult>();
+        Assert.IsType<OkObjectResult>(result.Result);
         var okResult = result.Result as OkObjectResult;
-        okResult!.Value.Should().Be(expectedContact);
+        Assert.Equal(expectedContact, okResult!.Value);
     }
 
     [Fact]
@@ -113,7 +112,7 @@ public class ContactsControllerTests
         var result = await _controller.GetContactMessage(contactId);
 
         // Assert
-        result.Result.Should().BeOfType<NotFoundResult>();
+        Assert.IsType<NotFoundResult>(result.Result);
     }
 
     [Fact]
@@ -159,11 +158,11 @@ public class ContactsControllerTests
         var result = await _controller.GetContactMessages(pagination);
 
         // Assert
-        result.Result.Should().BeOfType<OkObjectResult>();
+        Assert.IsType<OkObjectResult>(result.Result);
         var okResult = result.Result as OkObjectResult;
         var contacts = okResult!.Value as IEnumerable<ContactMessageDto>;
-        contacts.Should().HaveCount(2);
-        contacts.Should().BeEquivalentTo(expectedContacts);
+        Assert.Equal(2, contacts!.Count());
+        Assert.Equivalent(expectedContacts, contacts);
     }
 
     [Fact]
@@ -181,7 +180,7 @@ public class ContactsControllerTests
         var result = await _controller.GetContactMessages(pagination, ContactStatus.New, ContactType.General);
 
         // Assert
-        result.Result.Should().BeOfType<OkObjectResult>();
+        Assert.IsType<OkObjectResult>(result.Result);
 
         // Verify that the service was called with corrected parameters (page=1, pageSize=20)
         _contactServiceMock.Verify(x => x.GetContactMessagesAsync(1, 20, ContactStatus.New, ContactType.General, null), Times.Once);
@@ -220,9 +219,9 @@ public class ContactsControllerTests
         var result = await _controller.UpdateContactStatus(contactId, updateRequest);
 
         // Assert
-        result.Result.Should().BeOfType<OkObjectResult>();
+        Assert.IsType<OkObjectResult>(result.Result);
         var okResult = result.Result as OkObjectResult;
-        okResult!.Value.Should().Be(updatedContact);
+        Assert.Equal(updatedContact, okResult!.Value);
     }
 
     [Fact]
@@ -243,7 +242,7 @@ public class ContactsControllerTests
         var result = await _controller.UpdateContactStatus(contactId, updateRequest);
 
         // Assert
-        result.Result.Should().BeOfType<NotFoundResult>();
+        Assert.IsType<NotFoundResult>(result.Result);
     }
 
     [Fact]
@@ -259,7 +258,7 @@ public class ContactsControllerTests
         var result = await _controller.DeleteContactMessage(contactId);
 
         // Assert
-        result.Should().BeOfType<NoContentResult>();
+        Assert.IsType<NoContentResult>(result);
     }
 
     [Fact]
@@ -275,7 +274,7 @@ public class ContactsControllerTests
         var result = await _controller.DeleteContactMessage(contactId);
 
         // Assert
-        result.Should().BeOfType<NotFoundResult>();
+        Assert.IsType<NotFoundResult>(result);
     }
 
     [Fact]
@@ -305,10 +304,10 @@ public class ContactsControllerTests
         var result = await _controller.GetContactFiles(contactId);
 
         // Assert
-        result.Result.Should().BeOfType<OkObjectResult>();
+        Assert.IsType<OkObjectResult>(result.Result);
         var okResult = result.Result as OkObjectResult;
         var files = okResult!.Value as IEnumerable<ContactFileDto>;
-        files.Should().BeEquivalentTo(expectedFiles);
+        Assert.Equivalent(expectedFiles, files);
     }
 
     [Fact]
@@ -325,7 +324,7 @@ public class ContactsControllerTests
         var result = await _controller.DeleteContactFile(contactId, fileId);
 
         // Assert
-        result.Should().BeOfType<NoContentResult>();
+        Assert.IsType<NoContentResult>(result);
     }
 
     [Fact]
@@ -342,7 +341,7 @@ public class ContactsControllerTests
         var result = await _controller.DeleteContactFile(contactId, fileId);
 
         // Assert
-        result.Should().BeOfType<NotFoundResult>();
+        Assert.IsType<NotFoundResult>(result);
     }
 
     [Fact]
@@ -392,11 +391,11 @@ public class ContactsControllerTests
         Console.WriteLine($"Is UploadServiceFileId null or empty: {string.IsNullOrEmpty(file.UploadServiceFileId)}");
 
         // Assert
-        result.Should().BeOfType<FileContentResult>();
+        Assert.IsType<FileContentResult>(result);
         var fileResult = result as FileContentResult;
-        fileResult!.FileContents.Should().BeEquivalentTo(new byte[] { 1, 2, 3, 4, 5 });
-        fileResult.ContentType.Should().Be("application/pdf");
-        fileResult.FileDownloadName.Should().Be("document.pdf");
+        Assert.Equal(new byte[] { 1, 2, 3, 4, 5 }, fileResult!.FileContents);
+        Assert.Equal("application/pdf", fileResult.ContentType);
+        Assert.Equal("document.pdf", fileResult.FileDownloadName);
     }
 
     [Fact]
@@ -414,7 +413,7 @@ public class ContactsControllerTests
         var result = await _controller.DownloadContactFile(contactId, fileId);
 
         // Assert
-        result.Should().BeOfType<NotFoundResult>();
+        Assert.IsType<NotFoundResult>(result);
     }
 
     [Fact]
@@ -427,8 +426,8 @@ public class ContactsControllerTests
         var authorizeAttribute = methodInfo?.GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), false);
 
         // Assert
-        authorizeAttribute.Should().NotBeNull();
-        authorizeAttribute.Should().HaveCount(1);
+        Assert.NotNull(authorizeAttribute);
+        Assert.Single(authorizeAttribute);
     }
 
     [Fact]
@@ -441,8 +440,8 @@ public class ContactsControllerTests
         var authorizeAttribute = methodInfo?.GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), false);
 
         // Assert
-        authorizeAttribute.Should().NotBeNull();
-        authorizeAttribute.Should().HaveCount(1);
+        Assert.NotNull(authorizeAttribute);
+        Assert.Single(authorizeAttribute);
     }
 
     [Fact]
@@ -455,8 +454,8 @@ public class ContactsControllerTests
         var authorizeAttribute = methodInfo?.GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), false);
 
         // Assert
-        authorizeAttribute.Should().NotBeNull();
-        authorizeAttribute.Should().HaveCount(1);
+        Assert.NotNull(authorizeAttribute);
+        Assert.Single(authorizeAttribute);
     }
 
     [Fact]
@@ -469,8 +468,8 @@ public class ContactsControllerTests
         var authorizeAttribute = methodInfo?.GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), false);
 
         // Assert
-        authorizeAttribute.Should().NotBeNull();
-        authorizeAttribute.Should().HaveCount(1);
+        Assert.NotNull(authorizeAttribute);
+        Assert.Single(authorizeAttribute);
     }
 
     [Fact]
@@ -483,8 +482,8 @@ public class ContactsControllerTests
         var authorizeAttribute = methodInfo?.GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), false);
 
         // Assert
-        authorizeAttribute.Should().NotBeNull();
-        authorizeAttribute.Should().HaveCount(1);
+        Assert.NotNull(authorizeAttribute);
+        Assert.Single(authorizeAttribute);
     }
 
     [Fact]
@@ -497,8 +496,8 @@ public class ContactsControllerTests
         var authorizeAttribute = methodInfo?.GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), false);
 
         // Assert
-        authorizeAttribute.Should().NotBeNull();
-        authorizeAttribute.Should().HaveCount(1);
+        Assert.NotNull(authorizeAttribute);
+        Assert.Single(authorizeAttribute);
     }
 
     [Fact]
@@ -511,8 +510,8 @@ public class ContactsControllerTests
         var authorizeAttribute = methodInfo?.GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), false);
 
         // Assert
-        authorizeAttribute.Should().NotBeNull();
-        authorizeAttribute.Should().HaveCount(1);
+        Assert.NotNull(authorizeAttribute);
+        Assert.Single(authorizeAttribute);
     }
 
     [Fact]
@@ -525,8 +524,8 @@ public class ContactsControllerTests
         var allowAnonymousAttribute = methodInfo?.GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AllowAnonymousAttribute), false);
 
         // Assert
-        allowAnonymousAttribute.Should().NotBeNull();
-        allowAnonymousAttribute.Should().HaveCount(1);
+        Assert.NotNull(allowAnonymousAttribute);
+        Assert.Single(allowAnonymousAttribute);
     }
 
 }

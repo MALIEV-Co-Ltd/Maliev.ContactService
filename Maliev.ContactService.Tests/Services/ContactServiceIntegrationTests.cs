@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Maliev.ContactService.Api.Models;
 using Maliev.ContactService.Api.Services;
 using Maliev.ContactService.Data.DbContexts;
@@ -102,17 +101,17 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
         var result = await _contactService.CreateContactMessageAsync(request);
 
         // Assert
-        result.Should().NotBeNull();
-        result.Id.Should().BeGreaterThan(0);
-        result.FullName.Should().Be("John Doe");
-        result.Email.Should().Be("john.doe@example.com");
-        result.Subject.Should().Be("Test Inquiry");
-        result.Message.Should().Be("This is a test message");
-        result.ContactType.Should().Be(ContactType.General);
-        result.Priority.Should().Be(Priority.High);
-        result.Status.Should().Be(ContactStatus.New);
-        result.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
-        result.UpdatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+        Assert.NotNull(result);
+        Assert.True(result.Id > 0);
+        Assert.Equal("John Doe", result.FullName);
+        Assert.Equal("john.doe@example.com", result.Email);
+        Assert.Equal("Test Inquiry", result.Subject);
+        Assert.Equal("This is a test message", result.Message);
+        Assert.Equal(ContactType.General, result.ContactType);
+        Assert.Equal(Priority.High, result.Priority);
+        Assert.Equal(ContactStatus.New, result.Status);
+        Assert.True((DateTime.UtcNow - result.CreatedAt).Duration() < TimeSpan.FromSeconds(5));
+        Assert.True((DateTime.UtcNow - result.UpdatedAt).Duration() < TimeSpan.FromSeconds(5));
 
         // Clean up for next test
         await _respawner.ResetAsync(_connection);
@@ -161,12 +160,12 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
         var result = await _contactService.CreateContactMessageAsync(request);
 
         // Assert
-        result.Should().NotBeNull();
-        result.Files.Should().HaveCount(1);
-        result.Files.First().FileName.Should().Be("requirements.pdf");
-        result.Files.First().ContentType.Should().Be("application/pdf");
-        result.Files.First().UploadServiceFileId.Should().Be("upload-123");
-        result.Files.First().FileSize.Should().Be(5);
+        Assert.NotNull(result);
+        Assert.Single(result.Files);
+        Assert.Equal("requirements.pdf", result.Files.First().FileName);
+        Assert.Equal("application/pdf", result.Files.First().ContentType);
+        Assert.Equal("upload-123", result.Files.First().UploadServiceFileId);
+        Assert.Equal(5, result.Files.First().FileSize);
 
         _uploadServiceMock.Verify(x => x.UploadFileAsync(
             It.Is<string>(s => s.Contains("contacts/") && s.Contains("requirements.pdf")),
@@ -209,11 +208,11 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
         var result = await _contactService.GetContactMessageByIdAsync(contact.Id);
 
         // Assert
-        result.Should().NotBeNull();
-        result!.Id.Should().Be(contact.Id);
-        result.FullName.Should().Be("Test User");
-        result.Email.Should().Be("test@example.com");
-        result.ContactType.Should().Be(ContactType.Business);
+        Assert.NotNull(result);
+        Assert.Equal(contact.Id, result!.Id);
+        Assert.Equal("Test User", result.FullName);
+        Assert.Equal("test@example.com", result.Email);
+        Assert.Equal(ContactType.Business, result.ContactType);
 
         // Clean up for next test
         await _respawner.ResetAsync(_connection);
@@ -256,11 +255,11 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
 
         // Assert
         var resultList = result.ToList();
-        resultList.Should().HaveCount(10);
+        Assert.Equal(10, resultList.Count);
         
         // The ordering should be by CreatedAt descending (most recent first)
         // User 1 has the most recent CreatedAt timestamp (baseTime.AddMinutes(-1)), so it should be first
-        resultList.First().FullName.Should().Be("User 1");
+        Assert.Equal("User 1", resultList.First().FullName);
 
         // Clean up for next test
         await _respawner.ResetAsync(_connection);
@@ -303,10 +302,10 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
         var result = await _contactService.UpdateContactStatusAsync(contact.Id, updateRequest);
 
         // Assert
-        result.Should().NotBeNull();
-        result!.Status.Should().Be(ContactStatus.InProgress);
-        result.Priority.Should().Be(Priority.High);
-        result.UpdatedAt.Should().BeAfter(contact.CreatedAt);
+        Assert.NotNull(result);
+        Assert.Equal(ContactStatus.InProgress, result!.Status);
+        Assert.Equal(Priority.High, result.Priority);
+        Assert.True(result.UpdatedAt > contact.CreatedAt);
 
         // Clean up for next test
         await _respawner.ResetAsync(_connection);
@@ -344,7 +343,7 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
 
         // Assert
         var deletedContact = await _context.ContactMessages.FindAsync(contact.Id);
-        deletedContact.Should().BeNull();
+        Assert.Null(deletedContact);
 
         // Clean up for next test
         await _respawner.ResetAsync(_connection);

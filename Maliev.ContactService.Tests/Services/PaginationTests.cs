@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using FluentAssertions;
 using Maliev.ContactService.Api.Services;
 using Maliev.ContactService.Data.DbContexts;
 using Maliev.ContactService.Data.Models;
@@ -72,9 +71,9 @@ public class PaginationTests : IDisposable
 
         // Assert
         var resultList = result.ToList();
-        resultList.Should().HaveCount(10);
-        resultList.First().FullName.Should().Be("User 11"); // The eleventh most recent user
-        resultList.Last().FullName.Should().Be("User 20"); // The twentieth most recent user
+        Assert.Equal(10, resultList.Count);
+        Assert.Equal("User 11", resultList.First().FullName); // The eleventh most recent user
+        Assert.Equal("User 20", resultList.Last().FullName); // The twentieth most recent user
     }
 
     [Fact]
@@ -108,9 +107,9 @@ public class PaginationTests : IDisposable
 
         // Assert
         var resultList = result.ToList();
-        resultList.Should().HaveCount(5); // Only 5 items on the last page (25 total, 10 per page × 2 full pages = 20, so 5 remaining)
-        resultList.First().FullName.Should().Be("User 21"); // The twenty-first most recent user
-        resultList.Last().FullName.Should().Be("User 25"); // The twenty-fifth (last) most recent user
+        Assert.Equal(5, resultList.Count); // Only 5 items on the last page (25 total, 10 per page × 2 full pages = 20, so 5 remaining)
+        Assert.Equal("User 21", resultList.First().FullName); // The twenty-first most recent user
+        Assert.Equal("User 25", resultList.Last().FullName); // The twenty-fifth (last) most recent user
     }
 
     [Fact]
@@ -144,7 +143,7 @@ public class PaginationTests : IDisposable
 
         // Assert
         var resultList = result.ToList();
-        resultList.Should().BeEmpty(); // No items on page 10 when there are only 3 pages (25 items, 10 per page)
+        Assert.Empty(resultList); // No items on page 10 when there are only 3 pages (25 items, 10 per page)
     }
 
     [Fact]
@@ -178,9 +177,9 @@ public class PaginationTests : IDisposable
 
         // Assert
         var resultList = result.ToList();
-        resultList.Should().HaveCount(5); // Only 5 items on the first page with pageSize=5
-        resultList.First().FullName.Should().Be("User 1"); // The most recent user
-        resultList.Last().FullName.Should().Be("User 5"); // The fifth most recent user
+        Assert.Equal(5, resultList.Count); // Only 5 items on the first page with pageSize=5
+        Assert.Equal("User 1", resultList.First().FullName); // The most recent user
+        Assert.Equal("User 5", resultList.Last().FullName); // The fifth most recent user
     }
 
     public void Dispose()

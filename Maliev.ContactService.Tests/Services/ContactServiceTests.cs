@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Maliev.ContactService.Api.Models;
 using Maliev.ContactService.Api.Services;
 using Maliev.ContactService.Data.DbContexts;
@@ -57,17 +56,17 @@ public class ContactServiceTests : IDisposable
         var result = await _contactService.CreateContactMessageAsync(request);
 
         // Assert
-        result.Should().NotBeNull();
-        result.Id.Should().BeGreaterThan(0);
-        result.FullName.Should().Be("John Doe");
-        result.Email.Should().Be("john.doe@example.com");
-        result.Subject.Should().Be("Test Inquiry");
-        result.Message.Should().Be("This is a test message");
-        result.ContactType.Should().Be(ContactType.General);
-        result.Priority.Should().Be(Priority.High);
-        result.Status.Should().Be(ContactStatus.New);
-        result.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
-        result.UpdatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+        Assert.NotNull(result);
+        Assert.True(result.Id > 0);
+        Assert.Equal("John Doe", result.FullName);
+        Assert.Equal("john.doe@example.com", result.Email);
+        Assert.Equal("Test Inquiry", result.Subject);
+        Assert.Equal("This is a test message", result.Message);
+        Assert.Equal(ContactType.General, result.ContactType);
+        Assert.Equal(Priority.High, result.Priority);
+        Assert.Equal(ContactStatus.New, result.Status);
+        Assert.True((DateTime.UtcNow - result.CreatedAt).Duration() < TimeSpan.FromSeconds(5));
+        Assert.True((DateTime.UtcNow - result.UpdatedAt).Duration() < TimeSpan.FromSeconds(5));
     }
 
     [Fact]
@@ -107,12 +106,12 @@ public class ContactServiceTests : IDisposable
         var result = await _contactService.CreateContactMessageAsync(request);
 
         // Assert
-        result.Should().NotBeNull();
-        result.Files.Should().HaveCount(1);
-        result.Files.First().FileName.Should().Be("requirements.pdf");
-        result.Files.First().ContentType.Should().Be("application/pdf");
-        result.Files.First().UploadServiceFileId.Should().Be("upload-123");
-        result.Files.First().FileSize.Should().Be(5);
+        Assert.NotNull(result);
+        Assert.Single(result.Files);
+        Assert.Equal("requirements.pdf", result.Files.First().FileName);
+        Assert.Equal("application/pdf", result.Files.First().ContentType);
+        Assert.Equal("upload-123", result.Files.First().UploadServiceFileId);
+        Assert.Equal(5, result.Files.First().FileSize);
 
         _uploadServiceMock.Verify(x => x.UploadFileAsync(
             It.Is<string>(s => s.Contains("contacts/") && s.Contains("requirements.pdf")),
@@ -146,11 +145,11 @@ public class ContactServiceTests : IDisposable
         var result = await _contactService.GetContactMessageByIdAsync(contact.Id);
 
         // Assert
-        result.Should().NotBeNull();
-        result!.Id.Should().Be(contact.Id);
-        result.FullName.Should().Be("Test User");
-        result.Email.Should().Be("test@example.com");
-        result.ContactType.Should().Be(ContactType.Business);
+        Assert.NotNull(result);
+        Assert.Equal(contact.Id, result!.Id);
+        Assert.Equal("Test User", result.FullName);
+        Assert.Equal("test@example.com", result.Email);
+        Assert.Equal(ContactType.Business, result.ContactType);
     }
 
     [Fact]
@@ -160,7 +159,7 @@ public class ContactServiceTests : IDisposable
         var result = await _contactService.GetContactMessageByIdAsync(999);
 
         // Assert
-        result.Should().BeNull();
+        Assert.Null(result);
     }
 
     [Fact]
@@ -191,10 +190,10 @@ public class ContactServiceTests : IDisposable
         var result2 = await _contactService.GetContactMessageByIdAsync(contact.Id);
 
         // Assert
-        result1.Should().NotBeNull();
-        result2.Should().NotBeNull();
-        result1!.Id.Should().Be(result2!.Id);
-        result1.FullName.Should().Be(result2.FullName);
+        Assert.NotNull(result1);
+        Assert.NotNull(result2);
+        Assert.Equal(result2!.Id, result1!.Id);
+        Assert.Equal(result2.FullName, result1.FullName);
     }
 
     [Fact]
@@ -228,10 +227,10 @@ public class ContactServiceTests : IDisposable
         var result = await _contactService.UpdateContactStatusAsync(contact.Id, updateRequest);
 
         // Assert
-        result.Should().NotBeNull();
-        result!.Status.Should().Be(ContactStatus.InProgress);
-        result.Priority.Should().Be(Priority.High);
-        result.UpdatedAt.Should().BeAfter(contact.CreatedAt);
+        Assert.NotNull(result);
+        Assert.Equal(ContactStatus.InProgress, result!.Status);
+        Assert.Equal(Priority.High, result.Priority);
+        Assert.True(result.UpdatedAt > contact.CreatedAt);
     }
 
     [Fact]
@@ -264,10 +263,10 @@ public class ContactServiceTests : IDisposable
         var result = await _contactService.UpdateContactStatusAsync(contact.Id, updateRequest);
 
         // Assert
-        result.Should().NotBeNull();
-        result!.Status.Should().Be(ContactStatus.Resolved);
-        result.ResolvedAt.Should().NotBeNull();
-        result.ResolvedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+        Assert.NotNull(result);
+        Assert.Equal(ContactStatus.Resolved, result!.Status);
+        Assert.NotNull(result.ResolvedAt);
+        Assert.True((DateTime.UtcNow - result.ResolvedAt.Value).Duration() < TimeSpan.FromSeconds(5));
     }
 
     [Fact]
@@ -301,11 +300,11 @@ public class ContactServiceTests : IDisposable
 
         // Assert
         var resultList = result.ToList();
-        resultList.Should().HaveCount(10);
+        Assert.Equal(10, resultList.Count);
         // The ordering should be by CreatedAt descending (most recent first)
         // User 1 has the most recent CreatedAt timestamp (baseTime.AddMinutes(-1)), so it should be first
-        resultList.First().FullName.Should().Be("User 1"); // The most recent user
-        resultList.Last().FullName.Should().Be("User 10"); // The tenth most recent user
+        Assert.Equal("User 1", resultList.First().FullName); // The most recent user
+        Assert.Equal("User 10", resultList.Last().FullName); // The tenth most recent user
     }
 
     [Fact]
@@ -324,8 +323,8 @@ public class ContactServiceTests : IDisposable
         var result = await _contactService.GetContactMessagesAsync(status: ContactStatus.InProgress);
 
         // Assert
-        result.Should().HaveCount(1);
-        result.First().FullName.Should().Be("User 2");
+        Assert.Single(result);
+        Assert.Equal("User 2", result.First().FullName);
     }
 
     [Fact]
@@ -354,7 +353,7 @@ public class ContactServiceTests : IDisposable
 
         // Assert
         var deletedContact = await _context.ContactMessages.FindAsync(contact.Id);
-        deletedContact.Should().BeNull();
+        Assert.Null(deletedContact);
     }
 
     [Fact]
@@ -397,7 +396,7 @@ public class ContactServiceTests : IDisposable
 
         // Assert
         var deletedFile = await _context.ContactFiles.FindAsync(contactFile.Id);
-        deletedFile.Should().BeNull();
+        Assert.Null(deletedFile);
     }
 
     [Fact]
@@ -407,7 +406,7 @@ public class ContactServiceTests : IDisposable
         Func<Task> act = async () => await _contactService.CreateContactMessageAsync(null!);
 
         // Assert
-        await act.Should().ThrowAsync<ArgumentNullException>();
+        await Assert.ThrowsAsync<ArgumentNullException>(act);
     }
 
     [Fact]
@@ -439,10 +438,10 @@ public class ContactServiceTests : IDisposable
         var result = await _contactService.CreateContactMessageAsync(request);
 
         // Assert
-        result.Should().NotBeNull();
-        result.Id.Should().BeGreaterThan(0);
-        result.FullName.Should().Be("Upload Fail Test");
-        result.Files.Should().BeEmpty(); // Files should be empty because upload failed
+        Assert.NotNull(result);
+        Assert.True(result.Id > 0);
+        Assert.Equal("Upload Fail Test", result.FullName);
+        Assert.Empty(result.Files); // Files should be empty because upload failed
 
         // Verify that the error was logged
         _loggerMock.Verify(
@@ -465,13 +464,13 @@ public class ContactServiceTests : IDisposable
             Status = ContactStatus.InProgress
         };
 
-        _context.ContactMessages.Where(c => c.Id == contactId).ToList().Should().BeEmpty();
+        Assert.Empty(_context.ContactMessages.Where(c => c.Id == contactId).ToList());
 
         // Act
         Func<Task> act = async () => await _contactService.UpdateContactStatusAsync(contactId, updateRequest);
 
         // Assert
-        await act.Should().ThrowAsync<Maliev.ContactService.Api.Exceptions.NotFoundException>();
+        await Assert.ThrowsAsync<Maliev.ContactService.Api.Exceptions.NotFoundException>(act);
     }
 
     [Fact]
@@ -480,13 +479,13 @@ public class ContactServiceTests : IDisposable
         // Arrange
         var contactId = 999; // Non-existent contact ID
 
-        _context.ContactMessages.Where(c => c.Id == contactId).ToList().Should().BeEmpty();
+        Assert.Empty(_context.ContactMessages.Where(c => c.Id == contactId).ToList());
 
         // Act
         Func<Task> act = async () => await _contactService.DeleteContactMessageAsync(contactId);
 
         // Assert
-        await act.Should().ThrowAsync<Maliev.ContactService.Api.Exceptions.NotFoundException>();
+        await Assert.ThrowsAsync<Maliev.ContactService.Api.Exceptions.NotFoundException>(act);
     }
 
     [Fact]
@@ -515,20 +514,20 @@ public class ContactServiceTests : IDisposable
 
         // Verify the contact exists
         var existingContact = await _context.ContactMessages.FindAsync(contactId);
-        existingContact.Should().NotBeNull();
+        Assert.NotNull(existingContact);
 
         // Verify no files exist for this contact
         var existingFiles = await _context.ContactFiles
             .Where(f => f.ContactMessageId == contactId)
             .ToListAsync()
             ;
-        existingFiles.Should().BeEmpty();
+        Assert.Empty(existingFiles);
 
         // Act
         Func<Task> act = async () => await _contactService.DeleteContactFileAsync(contactId, fileId);
 
         // Assert
-        await act.Should().ThrowAsync<Maliev.ContactService.Api.Exceptions.NotFoundException>();
+        await Assert.ThrowsAsync<Maliev.ContactService.Api.Exceptions.NotFoundException>(act);
     }
 
     [Fact]
@@ -557,20 +556,20 @@ public class ContactServiceTests : IDisposable
 
         // Verify the contact exists
         var existingContact = await _context.ContactMessages.FindAsync(contactId);
-        existingContact.Should().NotBeNull();
+        Assert.NotNull(existingContact);
 
         // Verify no files exist for this contact
         var existingFiles = await _context.ContactFiles
             .Where(f => f.ContactMessageId == contactId)
             .ToListAsync()
             ;
-        existingFiles.Should().BeEmpty();
+        Assert.Empty(existingFiles);
 
         // Act
         var result = await _contactService.GetContactFileByIdAsync(contactId, fileId);
 
         // Assert
-        result.Should().BeNull();
+        Assert.Null(result);
     }
 
     [Fact]
@@ -612,13 +611,13 @@ public class ContactServiceTests : IDisposable
         var result = await _contactService.GetContactFileByIdAsync(contact.Id, contactFile.Id);
 
         // Assert
-        result.Should().NotBeNull();
-        result!.Id.Should().Be(contactFile.Id);
-        result.FileName.Should().Be("test.pdf");
-        result.ObjectName.Should().Be($"contacts/{contact.Id}/test.pdf");
-        result.FileSize.Should().Be(1024);
-        result.ContentType.Should().Be("application/pdf");
-        result.UploadServiceFileId.Should().Be("upload-123");
+        Assert.NotNull(result);
+        Assert.Equal(contactFile.Id, result!.Id);
+        Assert.Equal("test.pdf", result.FileName);
+        Assert.Equal($"contacts/{contact.Id}/test.pdf", result.ObjectName);
+        Assert.Equal(1024, result.FileSize);
+        Assert.Equal("application/pdf", result.ContentType);
+        Assert.Equal("upload-123", result.UploadServiceFileId);
     }
 
     [Fact]
@@ -634,7 +633,7 @@ public class ContactServiceTests : IDisposable
         Func<Task> act = async () => await _contactService.UpdateContactStatusAsync(999, updateRequest);
 
         // Assert
-        await act.Should().ThrowAsync<Api.Exceptions.NotFoundException>();
+        await Assert.ThrowsAsync<Api.Exceptions.NotFoundException>(act);
     }
 
     [Fact]
@@ -644,7 +643,7 @@ public class ContactServiceTests : IDisposable
         Func<Task> act = async () => await _contactService.DeleteContactMessageAsync(999);
 
         // Assert
-        await act.Should().ThrowAsync<Api.Exceptions.NotFoundException>();
+        await Assert.ThrowsAsync<Api.Exceptions.NotFoundException>(act);
     }
 
     [Fact]
@@ -672,7 +671,7 @@ public class ContactServiceTests : IDisposable
         Func<Task> act = async () => await _contactService.DeleteContactFileAsync(contact.Id, 999);
 
         // Assert
-        await act.Should().ThrowAsync<Api.Exceptions.NotFoundException>();
+        await Assert.ThrowsAsync<Api.Exceptions.NotFoundException>(act);
     }
 
     [Fact]
@@ -697,12 +696,12 @@ public class ContactServiceTests : IDisposable
 
         // Prime the cache by fetching the contact
         var cachedResult = await _contactService.GetContactMessageByIdAsync(contact.Id);
-        cachedResult.Should().NotBeNull();
-        cachedResult!.Status.Should().Be(ContactStatus.New);
+        Assert.NotNull(cachedResult);
+        Assert.Equal(ContactStatus.New, cachedResult!.Status);
 
         // Verify that the item is in cache
         var cacheKey = $"contact_message_{contact.Id}";
-        _cache.Get(cacheKey).Should().NotBeNull();
+        Assert.NotNull(_cache.Get(cacheKey));
 
         var updateRequest = new UpdateContactStatusRequest
         {
@@ -715,15 +714,15 @@ public class ContactServiceTests : IDisposable
         // Assert
         // Cache should be invalidated and repopulated with updated data
         var cachedAfterUpdate = _cache.Get(cacheKey);
-        cachedAfterUpdate.Should().NotBeNull();
+        Assert.NotNull(cachedAfterUpdate);
         
         // The cached data should reflect the updated status
         var cachedDto = cachedAfterUpdate as ContactMessageDto;
-        cachedDto.Should().NotBeNull();
-        cachedDto!.Status.Should().Be(ContactStatus.InProgress);
+        Assert.NotNull(cachedDto);
+        Assert.Equal(ContactStatus.InProgress, cachedDto!.Status);
         
         // The returned result should also have the updated status
-        updatedResult.Status.Should().Be(ContactStatus.InProgress);
+        Assert.Equal(ContactStatus.InProgress, updatedResult.Status);
     }
 
     [Fact]
@@ -748,18 +747,18 @@ public class ContactServiceTests : IDisposable
 
         // Prime the cache by fetching the contact
         var cachedResult = await _contactService.GetContactMessageByIdAsync(contact.Id);
-        cachedResult.Should().NotBeNull();
+        Assert.NotNull(cachedResult);
 
         // Verify that the item is in cache
         var cacheKey = $"contact_message_{contact.Id}";
-        _cache.Get(cacheKey).Should().NotBeNull();
+        Assert.NotNull(_cache.Get(cacheKey));
 
         // Act
         await _contactService.DeleteContactMessageAsync(contact.Id);
 
         // Assert
         // Cache should be invalidated after delete (item should no longer exist)
-        _cache.Get(cacheKey).Should().BeNull();
+        Assert.Null(_cache.Get(cacheKey));
     }
 
     [Fact]
@@ -798,13 +797,13 @@ public class ContactServiceTests : IDisposable
 
         // Prime the cache by fetching the contact
         var cachedResult = await _contactService.GetContactMessageByIdAsync(contact.Id);
-        cachedResult.Should().NotBeNull();
-        cachedResult!.Files.Should().HaveCount(1);
+        Assert.NotNull(cachedResult);
+        Assert.Single(cachedResult!.Files);
 
         // Verify that the item is in cache
         var cacheKey = $"contact_message_{contact.Id}";
         var cachedItem = _cache.Get(cacheKey);
-        cachedItem.Should().NotBeNull();
+        Assert.NotNull(cachedItem);
 
         _uploadServiceMock.Setup(x => x.DeleteFileAsync("upload-789"))
             .ReturnsAsync(true);
@@ -814,7 +813,7 @@ public class ContactServiceTests : IDisposable
 
         // Assert
         // Cache should be invalidated after file delete
-        _cache.Get(cacheKey).Should().BeNull();
+        Assert.Null(_cache.Get(cacheKey));
     }
 
     [Fact(Skip = "List caching not currently implemented, but this test documents expected behavior if it were")]
@@ -865,16 +864,16 @@ public class ContactServiceTests : IDisposable
         // Prime the cache by fetching individual contacts
         var cachedContact1 = await _contactService.GetContactMessageByIdAsync(contact1.Id);
         var cachedContact2 = await _contactService.GetContactMessageByIdAsync(contact2.Id);
-        cachedContact1.Should().NotBeNull();
-        cachedContact2.Should().NotBeNull();
+        Assert.NotNull(cachedContact1);
+        Assert.NotNull(cachedContact2);
 
         // Prime the cache by fetching contact lists
         var cachedList = await _contactService.GetContactMessagesAsync(page: 1, pageSize: 10);
-        cachedList.Should().NotBeNull();
+        Assert.NotNull(cachedList);
 
         // Verify that items are in cache
-        _cache.Get($"contact_message_{contact1.Id}").Should().NotBeNull();
-        _cache.Get($"contact_message_{contact2.Id}").Should().NotBeNull();
+        Assert.NotNull(_cache.Get($"contact_message_{contact1.Id}"));
+        Assert.NotNull(_cache.Get($"contact_message_{contact2.Id}"));
 
         // Act
         await _contactService.DeleteContactMessageAsync(contact1.Id);
@@ -882,8 +881,8 @@ public class ContactServiceTests : IDisposable
         // Assert
         // All cache entries should be invalidated after delete
         // The cache entries should be null because we're using CancellationTokenSource for invalidation
-        _cache.Get($"contact_message_{contact1.Id}").Should().BeNull();
-        _cache.Get($"contact_message_{contact2.Id}").Should().BeNull();
+        Assert.Null(_cache.Get($"contact_message_{contact1.Id}"));
+        Assert.Null(_cache.Get($"contact_message_{contact2.Id}"));
     }
 
     [Fact]
@@ -926,9 +925,9 @@ public class ContactServiceTests : IDisposable
         var result = await _contactService.CreateContactMessageAsync(request);
 
         // Assert
-        result.Should().NotBeNull();
-        result.Id.Should().BeGreaterThan(0);
-        result.FullName.Should().Be("Rollback Test");
+        Assert.NotNull(result);
+        Assert.True(result.Id > 0);
+        Assert.Equal("Rollback Test", result.FullName);
         
         // Verify file upload was called
         _uploadServiceMock.Verify(x => x.UploadFileAsync(
