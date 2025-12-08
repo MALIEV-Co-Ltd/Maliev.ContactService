@@ -2,25 +2,36 @@ using System.Net;
 using System.Net.Http.Json;
 using Maliev.ContactService.Api.Models;
 using Maliev.ContactService.Data.Models;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 
 namespace Maliev.ContactService.Tests.Integration;
 
 /// <summary>
-/// Integration tests for ContactsController using WebApplicationFactory
-/// These tests demonstrate the approach suggested in GitHub issue #34
+/// Integration tests for ContactsController using WebApplicationFactory.
+/// These tests use a real PostgreSQL database via Testcontainers.
 /// </summary>
 [Trait("Category", "Integration")]
-public class ContactsControllerIntegrationTests : IClassFixture<CustomWebApplicationFactory<Program>>
+public class ContactsControllerIntegrationTests : IClassFixture<CustomWebApplicationFactory<Program>>, IAsyncLifetime
 {
-    private readonly HttpClient _client;
+    private readonly CustomWebApplicationFactory<Program> _factory;
+    private HttpClient _client = null!;
 
     public ContactsControllerIntegrationTests(CustomWebApplicationFactory<Program> factory)
     {
-        _client = factory.CreateClient();
+        _factory = factory;
+    }
+
+    public async Task InitializeAsync()
+    {
+        // The factory and its database container are initialized here
+        await _factory.InitializeAsync();
+        _client = _factory.CreateClient();
+    }
+
+    public async Task DisposeAsync()
+    {
+        _client?.Dispose();
+        await Task.CompletedTask;
     }
 
     [Fact]

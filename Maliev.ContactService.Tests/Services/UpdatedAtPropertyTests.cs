@@ -3,7 +3,7 @@ using Maliev.ContactService.Api.Services;
 using Maliev.ContactService.Data.DbContexts;
 using Maliev.ContactService.Data.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -12,7 +12,7 @@ namespace Maliev.ContactService.Tests.Services;
 public class UpdatedAtPropertyTests : IDisposable
 {
     private readonly ContactDbContext _context;
-    private readonly IMemoryCache _cache;
+    private readonly Mock<IDistributedCache> _cacheMock;
     private readonly Mock<IUploadServiceClient> _uploadServiceMock;
     private readonly Mock<ICountryServiceClient> _countryServiceMock;
     private readonly Mock<ILogger<Api.Services.ContactService>> _loggerMock;
@@ -25,7 +25,7 @@ public class UpdatedAtPropertyTests : IDisposable
             .Options;
 
         _context = new ContactDbContext(options);
-        _cache = new MemoryCache(new MemoryCacheOptions());
+        _cacheMock = new Mock<IDistributedCache>();
         _uploadServiceMock = new Mock<IUploadServiceClient>();
         _countryServiceMock = new Mock<ICountryServiceClient>();
         _loggerMock = new Mock<ILogger<Api.Services.ContactService>>();
@@ -33,7 +33,7 @@ public class UpdatedAtPropertyTests : IDisposable
         _countryServiceMock.Setup(x => x.ValidateCountryExistsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
-        _contactService = new Api.Services.ContactService(_context, _cache, _uploadServiceMock.Object, _countryServiceMock.Object, _loggerMock.Object);
+        _contactService = new Api.Services.ContactService(_context, _cacheMock.Object, _uploadServiceMock.Object, _countryServiceMock.Object, _loggerMock.Object);
     }
 
     [Fact]
@@ -100,6 +100,5 @@ public class UpdatedAtPropertyTests : IDisposable
     public void Dispose()
     {
         _context?.Dispose();
-        _cache?.Dispose();
     }
 }

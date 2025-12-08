@@ -62,7 +62,7 @@ public class RateLimitingIntegrationTests : IClassFixture<RateLimitingTestWebApp
         Assert.Equal(HttpStatusCode.TooManyRequests, rateLimitedResponse.StatusCode);
     }
 
-    [Fact(Skip = "Test is flaky due to InMemory database conflicts between test runs - rate limiting already verified by CreateContactMessage_Should_Be_Rate_Limited")]
+    [Fact]
     public async Task CreateContactMessage_Should_Allow_Requests_After_Rate_Limit_Period()
     {
         // Arrange

@@ -6,78 +6,116 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using System;
+using System.Linq;
+using System.Security.Cryptography;
+using Microsoft.Extensions.Caching.Distributed;
+using Testcontainers.PostgreSql;
 
 namespace Maliev.ContactService.Tests.Integration;
 
 /// <summary>
 /// Custom WebApplicationFactory for integration tests.
-/// Configures Testing environment with in-memory database and mock services.
+/// Configures Testing environment with a PostgreSQL database via Testcontainers and mock services.
 /// </summary>
-public class CustomWebApplicationFactory<TProgram> : WebApplicationFactory<TProgram> where TProgram : class
+public class CustomWebApplicationFactory<TProgram> : WebApplicationFactory<TProgram>, IAsyncLifetime where TProgram : class
 {
+    private PostgreSqlContainer? _postgresContainer;
+    private string _connectionString = string.Empty;
+    private readonly RSA _rsaKey;
+
+    public CustomWebApplicationFactory()
+    {
+        _rsaKey = RSA.Create(2048);
+        EnsureContainerStarted();
+    }
+
+    private void EnsureContainerStarted()
+    {
+        if (_postgresContainer != null) return;
+
+        _postgresContainer = new PostgreSqlBuilder()
+            .WithImage("postgres:18")
+            .WithDatabase("custom_factory_db")
+            .WithUsername("postgres")
+            .WithPassword("test_password")
+            .WithCleanUp(true)
+            .Build();
+
+        _postgresContainer.StartAsync().GetAwaiter().GetResult();
+        _connectionString = _postgresContainer.GetConnectionString();
+        ApplyMigrationsAsync().GetAwaiter().GetResult();
+    }
+
+    public Task InitializeAsync()
+    {
+        return Task.CompletedTask;
+    }
+
+    public new async Task DisposeAsync()
+    {
+        if (_postgresContainer != null)
+        {
+            await _postgresContainer.DisposeAsync();
+        }
+        _rsaKey.Dispose();
+        await base.DisposeAsync();
+    }
+
+    private async Task ApplyMigrationsAsync()
+    {
+        if (string.IsNullOrEmpty(_connectionString)) return;
+
+        var optionsBuilder = new DbContextOptionsBuilder<ContactDbContext>();
+        optionsBuilder.UseNpgsql(_connectionString);
+
+        using var db = new ContactDbContext(optionsBuilder.Options);
+        await db.Database.MigrateAsync();
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+        builder.UseSetting("UseTestcontainers", "true");
 
-        // Skip DbContext configuration in Program.cs
-        builder.UseSetting("UseTestcontainers", "false");
+        var publicKeyPem = _rsaKey.ExportRSAPublicKeyPem();
+        var publicKeyBase64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(publicKeyPem));
+        builder.UseSetting("Jwt:PublicKey", publicKeyBase64);
 
         builder.ConfigureServices(services =>
         {
-            // Remove DbContext registrations from Program.cs if any
-            var dbContextDescriptor = services.SingleOrDefault(
-                d => d.ServiceType == typeof(DbContextOptions<ContactDbContext>));
-            if (dbContextDescriptor != null)
+            EnsureContainerStarted();
+            if (string.IsNullOrEmpty(_connectionString))
             {
-                services.Remove(dbContextDescriptor);
+                throw new InvalidOperationException("Testcontainers connection string is not initialized");
             }
 
-            var contextDescriptor = services.SingleOrDefault(
-                d => d.ServiceType == typeof(ContactDbContext));
-            if (contextDescriptor != null)
-            {
-                services.Remove(contextDescriptor);
-            }
+            var dbContextDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<ContactDbContext>));
+            if (dbContextDescriptor != null) services.Remove(dbContextDescriptor);
 
-            // Use InMemory database for tests
-            services.AddDbContext<ContactDbContext>(options =>
-            {
-                options.UseInMemoryDatabase($"ContactTestDb_{Guid.NewGuid()}");
-            });
+            var contextDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(ContactDbContext));
+            if (contextDescriptor != null) services.Remove(contextDescriptor);
 
-            // Remove the real IUploadServiceClient registration
-            var uploadServiceDescriptor = services.SingleOrDefault(
-                d => d.ServiceType == typeof(IUploadServiceClient));
+            var cacheDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IDistributedCache));
+            if (cacheDescriptor != null) services.Remove(cacheDescriptor);
+            
+            services.AddDbContext<ContactDbContext>(options => { options.UseNpgsql(_connectionString); });
 
-            if (uploadServiceDescriptor != null)
-            {
-                services.Remove(uploadServiceDescriptor);
-            }
+            services.AddDistributedMemoryCache();
 
-            // Add the mock implementation for IUploadServiceClient
             services.AddScoped<IUploadServiceClient, MockUploadServiceClient>();
-
-            // Remove the real ICountryServiceClient registration
-            var countryServiceDescriptor = services.SingleOrDefault(
-                d => d.ServiceType == typeof(ICountryServiceClient));
-
-            if (countryServiceDescriptor != null)
-            {
-                services.Remove(countryServiceDescriptor);
-            }
-
-            // Add the mock implementation for ICountryServiceClient
             services.AddScoped<ICountryServiceClient, MockCountryServiceClient>();
 
-            // Disable rate limiting for tests to avoid interference between test cases
             services.PostConfigure<Microsoft.AspNetCore.RateLimiting.RateLimiterOptions>(options =>
             {
                 options.GlobalLimiter = null;
             });
 
             services.AddAuthentication(TestAuthHandler.TestScheme)
-                .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(
-                    TestAuthHandler.TestScheme, options => {});
+                .AddScheme<TestAuthHandlerOptions, TestAuthHandler>(TestAuthHandler.TestScheme, options =>
+                {
+                    options.RsaKey = _rsaKey;
+                });
         });
     }
 }

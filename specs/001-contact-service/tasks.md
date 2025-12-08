@@ -370,6 +370,12 @@ After completing all tasks:
 - ✅ **FR-024**: Country Service unavailability handling (503 error)
 - ✅ **SC-003**: Inquiries confirmed within 2 seconds (verify with load test)
 - ✅ **SC-008**: 99% duplicate/spam blocked (verify with manual testing)
-- ✅ **SC-009**: Rate limiting enforces 10 inquiries per hour (verify with T055)
+- **SC-009**: Rate limiting enforces 10 inquiries per hour (verify with T055)
+
+---
+
+## Phase 8: Performance Enhancements
+
+- [ ] T062 [P] [US4] Implement list caching for admin queries (FR-043) in `ContactService.cs`. Cache paginated lists of inquiries and invalidate the cache upon any create, update, or delete operation to ensure data freshness.
 
 **MVP Readiness**: After completing Phases 1-3, the service is production-ready for User Story 1 (Basic Contact Inquiry) with all critical requirements met.

@@ -168,6 +168,11 @@ Support staff and administrators need to track, prioritize, and manage customer 
 - **FR-041**: System MUST return HTTP 410 Gone when admin attempts to download a file that was deleted from Upload Service
 - **FR-042**: System MUST define "Country Service unavailable" as: connection timeout (>5 seconds per HTTP attempt, measured before Polly retries), HTTP 5xx response, connection refused, or circuit breaker open state. Total time including retries may exceed 5 seconds.
 
+#### Performance and Caching (FR-043)
+
+- **FR-043**: System SHOULD cache paginated lists of inquiries to improve performance for admin queries. Any operation that creates, updates, or deletes an inquiry MUST invalidate the cache to ensure data freshness.
+
+
 ### Key Entities
 
 - **Contact Inquiry**: Represents a customer inquiry or support request submitted through the contact form. Contains customer identification (fullName 1-200 characters, email, phoneNumber optional), location context (countryId), inquiry categorization (subject 1-500 characters, contactType enum), the inquiry message, optional business context (companyName), optional file attachments (files array with inline content), admin workflow fields (priority enum, status enum, resolvedAt timestamp), system-generated unique identifier (inquiryId), and timestamps (createdAt, updatedAt). Establishes relationship to Country entity via countryId and to ContactFile entities for file attachments.

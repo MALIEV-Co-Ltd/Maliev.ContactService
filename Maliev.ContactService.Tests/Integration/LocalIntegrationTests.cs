@@ -13,6 +13,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using System.Security.Cryptography;
+using Microsoft.Extensions.Caching.Distributed;
 using Testcontainers.PostgreSql;
 
 namespace Maliev.ContactService.Tests.Integration;
@@ -74,57 +76,6 @@ public class LocalIntegrationTests : IClassFixture<LocalTestWebApplicationFactor
         Assert.False(string.IsNullOrEmpty(content)); // readiness should return health check details
         // Readiness endpoint returns "Healthy" text format (matching liveness behavior)
         Assert.Equal("Healthy", content);
-    }
-
-    #endregion
-
-    #region T055: Rate Limiting Tests
-
-    [Fact(Skip = "Rate limiting is disabled in Testing environment - manual testing required")]
-    public async Task T055_Rate_Limiting_Should_Block_11th_Request_With_429()
-    {
-        // NOTE: This test is skipped because rate limiting is disabled in Testing environment
-        // To test rate limiting manually:
-        // 1. Deploy to dev/staging environment
-        // 2. Submit 11 contact forms from same IP within 1 hour
-        // 3. Verify 11th request returns HTTP 429
-
-        // Arrange - Create a unique client IP for this test
-        // Note: WebApplicationFactory uses the same IP for all requests, but rate limiting works per IP
-        var testEmail = $"ratelimit.{Guid.NewGuid():N}@example.com";
-
-        var requests = new List<Task<HttpResponseMessage>>();
-
-        // Act - Submit 11 requests rapidly
-        for (int i = 0; i < 11; i++)
-        {
-            var request = new CreateContactMessageRequest
-            {
-                FullName = $"Rate Limit Test {i}",
-                Email = $"{i}.{testEmail}",
-                Subject = "Rate Limit Test",
-                Message = "Testing rate limiting",
-                CountryId = 1,
-                ContactType = ContactType.General,
-                Priority = Priority.Medium,
-                Files = new List<CreateContactFileRequest>()
-            };
-
-            requests.Add(_client.PostAsJsonAsync("/contacts/v1/contacts", request));
-        }
-
-        var responses = await Task.WhenAll(requests);
-
-        // Assert
-        var successCount = responses.Count(r => r.StatusCode == HttpStatusCode.Created);
-        var rateLimitedCount = responses.Count(r => r.StatusCode == HttpStatusCode.TooManyRequests);
-
-        // Should allow 10 requests and block the 11th
-        Assert.True(successCount <= 10); // should allow up to 10 requests per hour
-        Assert.True(rateLimitedCount >= 1); // should block at least one request with 429
-
-        // At least one response should be 429
-        Assert.Contains(responses, r => r.StatusCode == HttpStatusCode.TooManyRequests); // the 11th request should return 429 Too Many Requests
     }
 
     #endregion
@@ -432,11 +383,11 @@ public class LocalTestWebApplicationFactory : WebApplicationFactory<Program>, IA
 {
     private PostgreSqlContainer? _postgresContainer;
     private string _connectionString = string.Empty;
+    private readonly RSA _rsaKey;
 
     public LocalTestWebApplicationFactory()
     {
-        // Eagerly initialize the container before anything else
-        // This ensures the connection string is available for ConfigureWebHost
+        _rsaKey = RSA.Create(2048);
         EnsureContainerStarted();
     }
 
@@ -444,8 +395,6 @@ public class LocalTestWebApplicationFactory : WebApplicationFactory<Program>, IA
     {
         if (_postgresContainer != null) return;
 
-        // Create and start a PostgreSQL container synchronously
-        // This is necessary because WebApplicationFactory requires synchronous initialization
         _postgresContainer = new PostgreSqlBuilder()
             .WithImage("postgres:18")
             .WithDatabase("contact_test_db")
@@ -455,17 +404,12 @@ public class LocalTestWebApplicationFactory : WebApplicationFactory<Program>, IA
             .Build();
 
         _postgresContainer.StartAsync().GetAwaiter().GetResult();
-
-        // Get the connection string from the running container
         _connectionString = _postgresContainer.GetConnectionString();
-
-        // Apply migrations to the test database
         ApplyMigrationsAsync().GetAwaiter().GetResult();
     }
 
     public Task InitializeAsync()
     {
-        // Container is already started in constructor
         return Task.CompletedTask;
     }
 
@@ -475,12 +419,13 @@ public class LocalTestWebApplicationFactory : WebApplicationFactory<Program>, IA
         {
             await _postgresContainer.DisposeAsync();
         }
+        _rsaKey.Dispose();
         await base.DisposeAsync();
     }
 
     private async Task ApplyMigrationsAsync()
     {
-        if (_connectionString == null) return;
+        if (string.IsNullOrEmpty(_connectionString)) return;
 
         var optionsBuilder = new DbContextOptionsBuilder<ContactDbContext>();
         optionsBuilder.UseNpgsql(_connectionString);
@@ -491,7 +436,7 @@ public class LocalTestWebApplicationFactory : WebApplicationFactory<Program>, IA
 
     public void CleanDatabase()
     {
-        if (_connectionString == null) return;
+        if (string.IsNullOrEmpty(_connectionString)) return;
 
         var optionsBuilder = new DbContextOptionsBuilder<ContactDbContext>();
         optionsBuilder.UseNpgsql(_connectionString);
@@ -511,13 +456,14 @@ public class LocalTestWebApplicationFactory : WebApplicationFactory<Program>, IA
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
-
-        // Set UseTestcontainers BEFORE configuration is loaded
         builder.UseSetting("UseTestcontainers", "true");
+        
+        var publicKeyPem = _rsaKey.ExportRSAPublicKeyPem();
+        var publicKeyBase64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(publicKeyPem));
+        builder.UseSetting("Jwt:PublicKey", publicKeyBase64);
 
         builder.ConfigureServices(services =>
         {
-            // Ensure container is started
             EnsureContainerStarted();
 
             if (string.IsNullOrEmpty(_connectionString))
@@ -525,7 +471,6 @@ public class LocalTestWebApplicationFactory : WebApplicationFactory<Program>, IA
                 throw new InvalidOperationException("Testcontainers connection string is not initialized");
             }
 
-            // Remove InMemoryDatabase DbContext registration from Program.cs
             var dbContextDescriptor = services.SingleOrDefault(
                 d => d.ServiceType == typeof(DbContextOptions<ContactDbContext>));
             if (dbContextDescriptor != null)
@@ -533,7 +478,6 @@ public class LocalTestWebApplicationFactory : WebApplicationFactory<Program>, IA
                 services.Remove(dbContextDescriptor);
             }
 
-            // Remove the actual DbContext registration too
             var contextDescriptor = services.SingleOrDefault(
                 d => d.ServiceType == typeof(ContactDbContext));
             if (contextDescriptor != null)
@@ -541,22 +485,27 @@ public class LocalTestWebApplicationFactory : WebApplicationFactory<Program>, IA
                 services.Remove(contextDescriptor);
             }
 
-            // Add PostgreSQL DbContext for testing with Testcontainers connection string
-            var connStr = _connectionString; // Capture for lambda
             services.AddDbContext<ContactDbContext>(options =>
             {
-                options.UseNpgsql(connStr);
+                options.UseNpgsql(_connectionString);
             });
 
-            // Since Program.cs skips HttpClient registration in Testing environment,
-            // we only need to register the mock implementations
+            var cacheDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IDistributedCache));
+            if (cacheDescriptor != null)
+            {
+                services.Remove(cacheDescriptor);
+            }
+            services.AddDistributedMemoryCache();
+
             services.AddScoped<IUploadServiceClient, MockUploadServiceClient>();
             services.AddScoped<ICountryServiceClient, MockCountryServiceClient>();
 
-            // Add test authentication
             services.AddAuthentication(TestAuthHandler.TestScheme)
-                .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(
-                    TestAuthHandler.TestScheme, options => {});
+                .AddScheme<TestAuthHandlerOptions, TestAuthHandler>(
+                    TestAuthHandler.TestScheme, options =>
+                    {
+                        options.RsaKey = _rsaKey;
+                    });
         });
     }
 }

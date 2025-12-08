@@ -3,7 +3,7 @@ using Maliev.ContactService.Api.Services;
 using Maliev.ContactService.Data.DbContexts;
 using Maliev.ContactService.Data.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Respawn;
@@ -16,7 +16,7 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
 {
     private readonly PostgreSqlContainer _dbContainer;
     private ContactDbContext? _context;
-    private readonly IMemoryCache _cache;
+    private readonly Mock<IDistributedCache> _cacheMock;
     private readonly Mock<IUploadServiceClient> _uploadServiceMock;
     private readonly Mock<ICountryServiceClient> _countryServiceMock;
     private readonly Mock<ILogger<Api.Services.ContactService>> _loggerMock;
@@ -30,7 +30,7 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
             .WithImage("postgres:15-alpine")
             .Build();
 
-        _cache = new MemoryCache(new MemoryCacheOptions());
+        _cacheMock = new Mock<IDistributedCache>();
         _uploadServiceMock = new Mock<IUploadServiceClient>();
         _countryServiceMock = new Mock<ICountryServiceClient>();
         _loggerMock = new Mock<ILogger<Api.Services.ContactService>>();
@@ -51,7 +51,7 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
         _context = new ContactDbContext(options);
         await _context.Database.MigrateAsync();
 
-        _contactService = new Api.Services.ContactService(_context, _cache, _uploadServiceMock.Object, _countryServiceMock.Object, _loggerMock.Object);
+        _contactService = new Api.Services.ContactService(_context, _cacheMock.Object, _uploadServiceMock.Object, _countryServiceMock.Object, _loggerMock.Object);
 
         // Set up Respawn for resetting database between tests
         _connection = _context.Database.GetDbConnection();
@@ -73,7 +73,6 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
             await _context.DisposeAsync();
         }
         await _dbContainer.DisposeAsync();
-        _cache.Dispose();
     }
 
     [Fact]
