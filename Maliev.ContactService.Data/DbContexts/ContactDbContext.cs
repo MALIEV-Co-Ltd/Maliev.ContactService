@@ -1,5 +1,6 @@
 using Maliev.ContactService.Data.Models;
 using Microsoft.EntityFrameworkCore;
+using Maliev.Aspire.ServiceDefaults.Database;
 
 namespace Maliev.ContactService.Data.DbContexts;
 
@@ -132,6 +133,9 @@ public class ContactDbContext : DbContext
                 .IsRequired()
                 .HasDefaultValueSql("NOW()");
 
+            // Ignore the RowVersion property (PostgreSQL doesn't need it for concurrency)
+            entity.Ignore(e => e.RowVersion);
+
             // Indexes for performance
             entity.HasIndex(e => e.Email);
             entity.HasIndex(e => e.CreatedAt);
@@ -179,5 +183,8 @@ public class ContactDbContext : DbContext
             // Index for foreign key
             entity.HasIndex(e => e.ContactMessageId);
         });
+
+        // Apply PostgreSQL snake_case naming convention globally
+        SnakeCaseNamingHelper.ApplySnakeCaseNaming(modelBuilder);
     }
 }

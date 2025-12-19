@@ -49,7 +49,7 @@ public class CountryServiceClient : ICountryServiceClient
         {
             _logger.LogInformation("Validating country ID {CountryId} via Country Service", countryId);
 
-            var response = await _httpClient.GetAsync($"/countries/v1/countries/{countryId}", cancellationToken);
+            var response = await _httpClient.GetAsync($"/country/v1/countries/{countryId}", cancellationToken);
 
             if (response.StatusCode == HttpStatusCode.NotFound)
             {

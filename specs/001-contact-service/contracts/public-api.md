@@ -115,7 +115,7 @@ Content-Type: application/pdf
 1. All required fields must be present and non-empty
 2. Email must be valid format (RFC 5322)
 3. Phone number (if provided) must match pattern: `^[\d\s\-\(\)\+]{8,20}$`
-4. CountryId must exist in Country Service (validated via GET /countries/v1/{id})
+4. CountryId must exist in Country Service (validated via GET /country/v1/{id})
 5. ContactType MUST NOT be 2 (Quotation) - rejected with validation error
 6. Files array limited to 10 items maximum
 7. Each file size must not exceed 25MB

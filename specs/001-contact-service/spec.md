@@ -3,7 +3,7 @@
 **Feature Branch**: `001-contact-service`
 **Created**: 2025-10-29
 **Status**: Draft
-**Input**: User description: "Create a Contact WebAPI service specification. This microservice handles all customer contact submissions from the website and other channels. It must collect user details (firstName, lastName, phoneNumber, email, countryId, and message), with optional fields (companyName, uploadIds, and metadata). It integrates with the Country Service (/countries/v1) for validation and the Upload Service (/uploads/v1) for file uploads to Google Cloud Storage. Quotation-related inquiries are excluded, as those are handled by the Quotation and Quotation Request Services."
+**Input**: User description: "Create a Contact WebAPI service specification. This microservice handles all customer contact submissions from the website and other channels. It must collect user details (firstName, lastName, phoneNumber, email, countryId, and message), with optional fields (companyName, uploadIds, and metadata). It integrates with the Country Service (/country/v1) for validation and the Upload Service (/uploads/v1) for file uploads to Google Cloud Storage. Quotation-related inquiries are excluded, as those are handled by the Quotation and Quotation Request Services."
 
 ## Clarifications
 
@@ -116,7 +116,7 @@ Support staff and administrators need to track, prioritize, and manage customer 
 - **FR-004**: System SHOULD validate phoneNumber format when provided (optional field, 8-20 characters, allowing numbers, spaces, hyphens, parentheses, plus sign)
 - **FR-005**: System MUST validate subject field is between 1-500 characters
 - **FR-006**: System MUST validate message field is not empty and does not exceed 10,000 characters
-- **FR-007**: System MUST validate countryId exists in the Country Service via GET /countries/v1/{id} before accepting inquiry
+- **FR-007**: System MUST validate countryId exists in the Country Service via GET /country/v1/{id} before accepting inquiry
 - **FR-008**: System MUST accept optional companyName field (1-200 characters) when provided
 - **FR-009**: System MUST accept optional files array with inline file content (fileName, fileContent bytes, contentType)
 - **FR-010**: System MUST limit files array to maximum 10 files per inquiry
@@ -384,7 +384,7 @@ public class ContactsController : ControllerBase
 - Add `CountryService` configuration section to `appsettings.json` with BaseUrl and timeout
 - Add database migration to add `CountryId` column to `ContactMessages` table
 - Update `CreateContactMessageRequest` model to include `countryId` (required field)
-- Implement validation in `ContactService.CreateContactMessageAsync()` to call Country Service GET `/countries/v1/{id}`
+- Implement validation in `ContactService.CreateContactMessageAsync()` to call Country Service GET `/country/v1/{id}`
 - Handle Country Service unavailability gracefully (circuit breaker pattern recommended)
 - Add integration tests for Country Service failures
 

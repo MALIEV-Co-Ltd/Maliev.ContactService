@@ -35,7 +35,7 @@ This document defines the external API contracts that the Contact Service depend
 
 ---
 
-### GET /countries/v1/{id}
+### GET /country/v1/{id}
 
 Validate that a country ID exists and retrieve country details.
 
@@ -45,7 +45,7 @@ Validate that a country ID exists and retrieve country details.
 
 **Request Example**:
 ```bash
-curl -X GET "http://maliev-country-service/api/countries/v1/1"
+curl -X GET "http://maliev-country-service/api/country/v1/1"
 ```
 
 **Response (200 OK)** - Country exists:
@@ -192,7 +192,7 @@ public async Task ValidateCountryExistsAsync_ValidCountry_ReturnsTrue()
 {
     // Mock HTTP response
     var mockHttp = new MockHttpMessageHandler();
-    mockHttp.When("http://*/countries/v1/1")
+    mockHttp.When("http://*/country/v1/1")
         .Respond("application/json", "{\"id\":1,\"name\":\"Thailand\",\"isActive\":true}");
 
     var client = new CountryServiceClient(mockHttp.ToHttpClient());
@@ -205,7 +205,7 @@ public async Task ValidateCountryExistsAsync_ValidCountry_ReturnsTrue()
 public async Task ValidateCountryExistsAsync_InvalidCountry_ReturnsFalse()
 {
     var mockHttp = new MockHttpMessageHandler();
-    mockHttp.When("http://*/countries/v1/999")
+    mockHttp.When("http://*/country/v1/999")
         .Respond(HttpStatusCode.NotFound);
 
     var client = new CountryServiceClient(mockHttp.ToHttpClient());
@@ -218,7 +218,7 @@ public async Task ValidateCountryExistsAsync_InvalidCountry_ReturnsFalse()
 public async Task ValidateCountryExistsAsync_ServiceUnavailable_ThrowsException()
 {
     var mockHttp = new MockHttpMessageHandler();
-    mockHttp.When("http://*/countries/v1/1")
+    mockHttp.When("http://*/country/v1/1")
         .Respond(HttpStatusCode.ServiceUnavailable);
 
     var client = new CountryServiceClient(mockHttp.ToHttpClient());

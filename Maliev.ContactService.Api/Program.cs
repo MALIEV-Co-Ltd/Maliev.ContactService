@@ -1,4 +1,4 @@
-using Maliev.ContactService.Api.HealthChecks;
+
 using Maliev.ContactService.Api.Middleware;
 using Maliev.ContactService.Api.Models;
 using Maliev.ContactService.Api.Services;
@@ -14,9 +14,11 @@ builder.AddGoogleSecretManagerVolume(); // Load secrets from /mnt/secrets if ava
 
 // --- Infrastructure & Observability ---
 builder.AddServiceDefaults(); // OpenTelemetry, health checks, resilience
-builder.AddServiceMeters("contacts"); // Register service meters for OpenTelemetry business metrics
+builder.AddServiceMeters("contacts-meter"); // Register service meters for OpenTelemetry business metrics
 
-builder.AddRedisDistributedCache(instanceName: "Contact:"); // Redis with in-memory fallback
+// Add Redis, MassTransit, and PostgreSQL DbContext
+// In testing, the test configuration provides Testcontainers connection strings
+builder.AddRedisDistributedCache(instanceName: "contact:"); // Redis with in-memory fallback
 builder.AddMassTransitWithRabbitMq(); // RabbitMQ message bus (non-blocking startup)
 builder.AddPostgresDbContext<ContactDbContext>(connectionStringName: "ContactDbContext"); // PostgreSQL with retry logic
 
@@ -97,26 +99,6 @@ builder.Services.AddHttpClient<ICountryServiceClient, CountryServiceClient>()
 // Register application services
 builder.Services.AddScoped<IContactService, ContactService>();
 
-// Configure Forwarded Headers
-builder.Services.Configure<ForwardedHeadersOptions>(options =>
-{
-    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-
-    if (builder.Environment.IsProduction() || builder.Environment.IsStaging())
-    {
-        options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse("10.0.0.0/8"));
-        options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse("172.16.0.0/12"));
-        options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse("192.168.0.0/16"));
-    }
-
-    options.KnownProxies.Add(System.Net.IPAddress.Loopback);
-    options.KnownProxies.Add(System.Net.IPAddress.IPv6Loopback);
-});
-
-// Add health checks with custom database health check
-builder.Services.AddHealthChecks()
-    .AddCheck<DatabaseHealthCheck>("Database Health Check", tags: new[] { "db", "ready" });
-
 builder.Services.AddControllers();
 
 var app = builder.Build();
@@ -156,10 +138,10 @@ app.UseAuthorization();
 app.MapControllers();
 
 // Map Aspire default endpoints (/health, /alive, /metrics)
-app.MapDefaultEndpoints(servicePrefix: "contacts");
+app.MapDefaultEndpoints(servicePrefix: "contact");
 
 // Map OpenAPI and Scalar documentation (dev/staging only)
-app.MapApiDocumentation(servicePrefix: "contacts");
+app.MapApiDocumentation(servicePrefix: "contact");
 
 logger.LogInformation("ContactService started successfully");
 await app.RunAsync();

@@ -12,8 +12,9 @@ namespace Maliev.ContactService.Api.Controllers;
 /// API controller for managing contact messages.
 /// </summary>
 [ApiController]
-[Route("contacts/v{version:apiVersion}/contacts")]
 [ApiVersion("1.0")]
+[Route("contact/v{version:apiVersion}/contacts")]
+[Produces("application/json")]
 public class ContactsController : ControllerBase
 {
     private readonly IContactService _contactService;
