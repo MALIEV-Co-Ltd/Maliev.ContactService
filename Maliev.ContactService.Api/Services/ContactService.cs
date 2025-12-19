@@ -72,9 +72,18 @@ public class ContactService : IContactService
             {
                 var contactMessage = new ContactMessage
                 {
-                    FullName = request.FullName, Email = request.Email, PhoneNumber = request.PhoneNumber, Company = request.Company,
-                    Subject = request.Subject, Message = request.Message, CountryId = request.CountryId, ContactType = request.ContactType,
-                    Priority = request.Priority, Status = ContactStatus.New, CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow
+                    FullName = request.FullName,
+                    Email = request.Email,
+                    PhoneNumber = request.PhoneNumber,
+                    Company = request.Company,
+                    Subject = request.Subject,
+                    Message = request.Message,
+                    CountryId = request.CountryId,
+                    ContactType = request.ContactType,
+                    Priority = request.Priority,
+                    Status = ContactStatus.New,
+                    CreatedAt = DateTimeOffset.UtcNow,
+                    UpdatedAt = DateTimeOffset.UtcNow
                 };
 
                 _context.ContactMessages.Add(contactMessage);
@@ -90,9 +99,13 @@ public class ContactService : IContactService
                             var uploadResponse = await _uploadService.UploadFileAsync(objectName, fileRequest.FileContent, fileRequest.ContentType ?? "application/octet-stream", fileRequest.FileName);
                             var contactFile = new ContactFile
                             {
-                                ContactMessageId = contactMessage.Id, FileName = fileRequest.FileName, ObjectName = objectName,
-                                FileSize = uploadResponse.FileSize, ContentType = fileRequest.ContentType ?? "application/octet-stream",
-                                UploadServiceFileId = uploadResponse.FileId, CreatedAt = DateTimeOffset.UtcNow
+                                ContactMessageId = contactMessage.Id,
+                                FileName = fileRequest.FileName,
+                                ObjectName = objectName,
+                                FileSize = uploadResponse.FileSize,
+                                ContentType = fileRequest.ContentType ?? "application/octet-stream",
+                                UploadServiceFileId = uploadResponse.FileId,
+                                CreatedAt = DateTimeOffset.UtcNow
                             };
                             _context.ContactFiles.Add(contactFile);
                         }
@@ -216,9 +229,15 @@ public class ContactService : IContactService
     public async Task<IEnumerable<ContactFileDto>> GetContactFilesAsync(int contactId)
     {
         return await _context.ContactFiles.Where(f => f.ContactMessageId == contactId).AsNoTracking()
-            .Select(f => new ContactFileDto {
-                Id = f.Id, FileName = f.FileName, ObjectName = f.ObjectName, FileSize = f.FileSize,
-                ContentType = f.ContentType, UploadServiceFileId = f.UploadServiceFileId, CreatedAt = f.CreatedAt
+            .Select(f => new ContactFileDto
+            {
+                Id = f.Id,
+                FileName = f.FileName,
+                ObjectName = f.ObjectName,
+                FileSize = f.FileSize,
+                ContentType = f.ContentType,
+                UploadServiceFileId = f.UploadServiceFileId,
+                CreatedAt = f.CreatedAt
             }).ToListAsync();
     }
 
@@ -227,9 +246,15 @@ public class ContactService : IContactService
     {
         return await _context.ContactFiles.AsNoTracking()
             .Where(f => f.ContactMessageId == contactId && f.Id == fileId)
-            .Select(f => new ContactFileDto {
-                Id = f.Id, FileName = f.FileName, ObjectName = f.ObjectName, FileSize = f.FileSize,
-                ContentType = f.ContentType, UploadServiceFileId = f.UploadServiceFileId, CreatedAt = f.CreatedAt
+            .Select(f => new ContactFileDto
+            {
+                Id = f.Id,
+                FileName = f.FileName,
+                ObjectName = f.ObjectName,
+                FileSize = f.FileSize,
+                ContentType = f.ContentType,
+                UploadServiceFileId = f.UploadServiceFileId,
+                CreatedAt = f.CreatedAt
             }).FirstOrDefaultAsync();
     }
 
@@ -258,7 +283,7 @@ public class ContactService : IContactService
         await _cache.RemoveAsync($"contact_message_{contactId}");
         _logger.LogInformation("Deleted contact file {FileId} from contact {ContactId}", fileId, contactId);
     }
-    
+
     private async Task<long> GetCacheVersionAsync()
     {
         var versionBytes = await _cache.GetAsync(ListCacheVersionKey);
@@ -275,14 +300,31 @@ public class ContactService : IContactService
 
     private static ContactMessageDto MapToDto(ContactMessage contact)
     {
-        return new ContactMessageDto {
-            Id = contact.Id, FullName = contact.FullName, Email = contact.Email, PhoneNumber = contact.PhoneNumber,
-            Company = contact.Company, Subject = contact.Subject, Message = contact.Message, CountryId = contact.CountryId,
-            ContactType = contact.ContactType, Priority = contact.Priority, Status = contact.Status,
-            CreatedAt = contact.CreatedAt, UpdatedAt = contact.UpdatedAt, ResolvedAt = contact.ResolvedAt,
-            Files = contact.Files.Select(f => new ContactFileDto {
-                Id = f.Id, FileName = f.FileName, ObjectName = f.ObjectName, FileSize = f.FileSize,
-                ContentType = f.ContentType, UploadServiceFileId = f.UploadServiceFileId, CreatedAt = f.CreatedAt
+        return new ContactMessageDto
+        {
+            Id = contact.Id,
+            FullName = contact.FullName,
+            Email = contact.Email,
+            PhoneNumber = contact.PhoneNumber,
+            Company = contact.Company,
+            Subject = contact.Subject,
+            Message = contact.Message,
+            CountryId = contact.CountryId,
+            ContactType = contact.ContactType,
+            Priority = contact.Priority,
+            Status = contact.Status,
+            CreatedAt = contact.CreatedAt,
+            UpdatedAt = contact.UpdatedAt,
+            ResolvedAt = contact.ResolvedAt,
+            Files = contact.Files.Select(f => new ContactFileDto
+            {
+                Id = f.Id,
+                FileName = f.FileName,
+                ObjectName = f.ObjectName,
+                FileSize = f.FileSize,
+                ContentType = f.ContentType,
+                UploadServiceFileId = f.UploadServiceFileId,
+                CreatedAt = f.CreatedAt
             }).ToList()
         };
     }
