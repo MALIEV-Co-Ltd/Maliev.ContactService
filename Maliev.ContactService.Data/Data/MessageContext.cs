@@ -31,7 +31,7 @@
         /// </summary>
         public virtual DbSet<Message> Message { get; set; }
 
-        
+
 
         /// <summary>
         /// Configures the schema needed for the message context.
