@@ -42,7 +42,7 @@ public class RateLimitingIntegrationTests : IClassFixture<RateLimitingTestWebApp
                 CountryId = 1,
                 ContactType = ContactType.General
             };
-            var response = await client.PostAsJsonAsync("/contacts/v1/contacts", request);
+            var response = await client.PostAsJsonAsync("/contact/v1/contacts", request);
             Assert.NotEqual(HttpStatusCode.TooManyRequests, response.StatusCode); // Request {i + 1} should not be rate limited
         }
 
@@ -56,7 +56,7 @@ public class RateLimitingIntegrationTests : IClassFixture<RateLimitingTestWebApp
             CountryId = 1,
             ContactType = ContactType.General
         };
-        var rateLimitedResponse = await client.PostAsJsonAsync("/contacts/v1/contacts", rateLimitRequest);
+        var rateLimitedResponse = await client.PostAsJsonAsync("/contact/v1/contacts", rateLimitRequest);
 
         // Assert
         Assert.Equal(HttpStatusCode.TooManyRequests, rateLimitedResponse.StatusCode);
@@ -81,7 +81,7 @@ public class RateLimitingIntegrationTests : IClassFixture<RateLimitingTestWebApp
                 CountryId = 1,
                 ContactType = ContactType.General
             };
-            await client.PostAsJsonAsync("/contacts/v1/contacts", request);
+            await client.PostAsJsonAsync("/contact/v1/contacts", request);
         }
 
         // Wait for rate limit window to reset (10 seconds)
@@ -97,7 +97,7 @@ public class RateLimitingIntegrationTests : IClassFixture<RateLimitingTestWebApp
             CountryId = 1,
             ContactType = ContactType.General
         };
-        var response = await client.PostAsJsonAsync("/contacts/v1/contacts", finalRequest);
+        var response = await client.PostAsJsonAsync("/contact/v1/contacts", finalRequest);
 
         // Assert
         Assert.NotEqual(HttpStatusCode.TooManyRequests, response.StatusCode);

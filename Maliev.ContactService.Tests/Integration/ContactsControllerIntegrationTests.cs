@@ -25,7 +25,7 @@ public class ContactsControllerIntegrationTests : IClassFixture<CustomWebApplica
     {
         // The factory and its database container are initialized here
         await _factory.InitializeAsync();
-        _client = _factory.CreateClient();
+        _client = _factory.CreateAuthenticatedClient("test-user", new[] { "Admin" });
     }
 
     public async Task DisposeAsync()
@@ -38,7 +38,7 @@ public class ContactsControllerIntegrationTests : IClassFixture<CustomWebApplica
     public async Task GetContactMessages_Should_Return_Success_With_Proper_Auth()
     {
         // Act - Use correct route with service prefix: /contacts/v{version}/contacts
-        var response = await _client.GetAsync("/contacts/v1/contacts");
+        var response = await _client.GetAsync("/contact/v1/contacts");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -61,7 +61,7 @@ public class ContactsControllerIntegrationTests : IClassFixture<CustomWebApplica
         };
 
         // Act - Use correct route with service prefix: /contacts/v{version}/contacts
-        var response = await _client.PostAsJsonAsync("/contacts/v1/contacts", request);
+        var response = await _client.PostAsJsonAsync("/contact/v1/contacts", request);
 
         // Assert
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);

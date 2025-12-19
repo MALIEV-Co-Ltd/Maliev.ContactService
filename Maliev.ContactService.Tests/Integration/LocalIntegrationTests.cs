@@ -25,23 +25,21 @@ namespace Maliev.ContactService.Tests.Integration;
 /// </summary>
 [Trait("Category", "Integration")]
 [Trait("Purpose", "LocalTesting")]
-public class LocalIntegrationTests : IClassFixture<LocalTestWebApplicationFactory>, IAsyncLifetime
+public class LocalIntegrationTests : IClassFixture<CustomWebApplicationFactory<Program>>, IAsyncLifetime
 {
-    private readonly LocalTestWebApplicationFactory _factory;
+    private readonly CustomWebApplicationFactory<Program> _factory;
     private HttpClient _client = null!;
 
-    public LocalIntegrationTests(LocalTestWebApplicationFactory factory)
+    public LocalIntegrationTests(CustomWebApplicationFactory<Program> factory)
     {
         _factory = factory;
     }
 
     public async Task InitializeAsync()
     {
-        // Wait for container to be ready
-        await _factory.InitializeAsync();
-
-        // Create client after container is initialized
+        // Create client
         _client = _factory.CreateClient();
+        await Task.CompletedTask;
     }
 
     public async Task DisposeAsync()
@@ -56,7 +54,7 @@ public class LocalIntegrationTests : IClassFixture<LocalTestWebApplicationFactor
     public async Task T054_Liveness_Endpoint_Should_Return_200_With_Healthy_Text()
     {
         // Act
-        var response = await _client.GetAsync("/contacts/liveness");
+        var response = await _client.GetAsync("/contact/liveness");
         var content = await response.Content.ReadAsStringAsync();
 
         // Assert
@@ -68,14 +66,14 @@ public class LocalIntegrationTests : IClassFixture<LocalTestWebApplicationFactor
     public async Task T054_Readiness_Endpoint_Should_Return_200_With_Health_Check_Structure()
     {
         // Act
-        var response = await _client.GetAsync("/contacts/readiness");
+        var response = await _client.GetAsync("/contact/readiness");
         var content = await response.Content.ReadAsStringAsync();
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode); // readiness endpoint should return 200 when healthy
         Assert.False(string.IsNullOrEmpty(content)); // readiness should return health check details
-        // Readiness endpoint returns "Healthy" text format (matching liveness behavior)
-        Assert.Equal("Healthy", content);
+        // Readiness endpoint returns JSON health check structure
+        Assert.Contains("Healthy", content); // Content should contain "Healthy" status
     }
 
     #endregion
@@ -100,13 +98,13 @@ public class LocalIntegrationTests : IClassFixture<LocalTestWebApplicationFactor
         };
 
         // Act - First submission (should succeed)
-        var response1 = await _client.PostAsJsonAsync("/contacts/v1/contacts", request);
+        var response1 = await _client.PostAsJsonAsync("/contact/v1/contacts", request);
 
         // Wait 2 seconds (well within 60 seconds window)
         await Task.Delay(TimeSpan.FromSeconds(2));
 
         // Act - Second submission with same email (should fail with 409)
-        var response2 = await _client.PostAsJsonAsync("/contacts/v1/contacts", request);
+        var response2 = await _client.PostAsJsonAsync("/contact/v1/contacts", request);
 
         // Assert
         Assert.Equal(HttpStatusCode.Created, response1.StatusCode); // first submission should succeed
@@ -149,8 +147,8 @@ public class LocalIntegrationTests : IClassFixture<LocalTestWebApplicationFactor
         };
 
         // Act
-        var response1 = await _client.PostAsJsonAsync("/contacts/v1/contacts", request1);
-        var response2 = await _client.PostAsJsonAsync("/contacts/v1/contacts", request2);
+        var response1 = await _client.PostAsJsonAsync("/contact/v1/contacts", request1);
+        var response2 = await _client.PostAsJsonAsync("/contact/v1/contacts", request2);
 
         // Assert
         Assert.Equal(HttpStatusCode.Created, response1.StatusCode); // first submission should succeed
@@ -180,7 +178,7 @@ public class LocalIntegrationTests : IClassFixture<LocalTestWebApplicationFactor
         };
 
         // Act
-        var response = await client.PostAsJsonAsync("/contacts/v1/contacts", request);
+        var response = await client.PostAsJsonAsync("/contact/v1/contacts", request);
         var content = await response.Content.ReadAsStringAsync();
 
         // Assert
@@ -209,14 +207,14 @@ public class LocalIntegrationTests : IClassFixture<LocalTestWebApplicationFactor
         };
 
         // Act - Try to create contact (should fail due to Country Service)
-        var createResponse = await client.PostAsJsonAsync("/contacts/v1/contacts", request);
+        var createResponse = await client.PostAsJsonAsync("/contact/v1/contacts", request);
 
         // Assert - Should return 503
         Assert.Equal(HttpStatusCode.ServiceUnavailable, createResponse.StatusCode);
 
         // Verify no contact was created by checking if we can query it
         // Since we're using in-memory DB and the same factory, the record should not exist
-        var getResponse = await client.GetAsync("/contacts/v1/contacts");
+        var getResponse = await client.GetAsync("/contact/v1/contacts");
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
 
         var contacts = await getResponse.Content.ReadFromJsonAsync<IEnumerable<ContactMessageDto>>();
@@ -246,7 +244,7 @@ public class LocalIntegrationTests : IClassFixture<LocalTestWebApplicationFactor
         };
 
         // Act
-        var response = await _client.PostAsJsonAsync("/contacts/v1/contacts", request);
+        var response = await _client.PostAsJsonAsync("/contact/v1/contacts", request);
 
         // Assert
         Assert.Equal(HttpStatusCode.Created, response.StatusCode); // valid contact submission should return 201 Created
@@ -275,7 +273,7 @@ public class LocalIntegrationTests : IClassFixture<LocalTestWebApplicationFactor
         };
 
         // Act
-        var response = await _client.PostAsJsonAsync("/contacts/v1/contacts", request);
+        var response = await _client.PostAsJsonAsync("/contact/v1/contacts", request);
 
         // Assert
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode); // invalid countryId should return 400 Bad Request due to Range validation
@@ -299,7 +297,7 @@ public class LocalIntegrationTests : IClassFixture<LocalTestWebApplicationFactor
         };
 
         // Act
-        var response = await _client.PostAsJsonAsync("/contacts/v1/contacts", request);
+        var response = await _client.PostAsJsonAsync("/contact/v1/contacts", request);
 
         // Assert - Quotation (2) is an invalid ContactType value, should return 400 Bad Request
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -325,7 +323,7 @@ public class LocalIntegrationTests : IClassFixture<LocalTestWebApplicationFactor
         };
 
         // Act
-        var response = await _client.PostAsJsonAsync("/contacts/v1/contacts", request);
+        var response = await _client.PostAsJsonAsync("/contact/v1/contacts", request);
 
         // Assert
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode); // missing required fields should return 400 Bad Request
@@ -340,8 +338,8 @@ public class LocalIntegrationTests : IClassFixture<LocalTestWebApplicationFactor
 
     private HttpClient CreateClientWithFailingCountryService()
     {
-        // Use the same factory but override the CountryServiceClient
-        return _factory.WithWebHostBuilder(builder =>
+        // Create a new factory instance with failing country service
+        var factoryWithFailingService = _factory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureServices(services =>
             {
@@ -357,7 +355,13 @@ public class LocalIntegrationTests : IClassFixture<LocalTestWebApplicationFactor
                 // Add a failing mock
                 services.AddScoped<ICountryServiceClient, FailingCountryServiceClient>();
             });
-        }).CreateClient();
+        });
+
+        // Create an authenticated client from the modified factory
+        var token = _factory.CreateTestJwtToken("test-user", new[] { "Admin" });
+        var client = factoryWithFailingService.CreateClient();
+        client.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+        return client;
     }
 
     #endregion
@@ -396,7 +400,7 @@ public class LocalTestWebApplicationFactory : WebApplicationFactory<Program>, IA
         if (_postgresContainer != null) return;
 
         _postgresContainer = new PostgreSqlBuilder()
-            .WithImage("postgres:18")
+            .WithImage("postgres:18-alpine")
             .WithDatabase("contact_test_db")
             .WithUsername("postgres")
             .WithPassword("test_password")
@@ -457,15 +461,20 @@ public class LocalTestWebApplicationFactory : WebApplicationFactory<Program>, IA
     {
         builder.UseEnvironment("Testing");
         builder.UseSetting("UseTestcontainers", "true");
-        
+
+        EnsureContainerStarted();
+
+        // Set connection string environment variable for Program.cs
+        Environment.SetEnvironmentVariable("ConnectionStrings__ContactDbContext", _connectionString);
+        // Set RabbitMQ connection string (use localhost default for tests)
+        Environment.SetEnvironmentVariable("ConnectionStrings__rabbitmq", "amqp://guest:guest@localhost:5672");
+
         var publicKeyPem = _rsaKey.ExportRSAPublicKeyPem();
         var publicKeyBase64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(publicKeyPem));
         builder.UseSetting("Jwt:PublicKey", publicKeyBase64);
 
         builder.ConfigureServices(services =>
         {
-            EnsureContainerStarted();
-
             if (string.IsNullOrEmpty(_connectionString))
             {
                 throw new InvalidOperationException("Testcontainers connection string is not initialized");
