@@ -118,7 +118,7 @@ Each microservice must be **self-contained**:
 
 ```dockerfile
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
-WORKDIR /
+WORKDIR /src
 COPY nuget.config ./
 COPY ["Maliev.Service.Api/Maliev.Service.Api.csproj", "Maliev.Service.Api/"]
 RUN --mount=type=secret,id=nuget_username \
