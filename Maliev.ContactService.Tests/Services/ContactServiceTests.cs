@@ -42,7 +42,7 @@ public class ContactServiceTests : IDisposable
 
         _countryServiceMock.Setup(x => x.ValidateCountryExistsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
-
+            
         _cacheMock.Setup(c => c.GetAsync(ListCacheVersionKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync((byte[]?)null);
 
@@ -279,7 +279,7 @@ public class ContactServiceTests : IDisposable
                 ContactType = i % 2 == 0 ? ContactType.General : ContactType.Business,
                 Priority = Priority.Medium,
                 Status = ContactStatus.New,
-                CreatedAt = baseTime.AddMinutes(-i),
+                CreatedAt = baseTime.AddMinutes(-i), 
                 UpdatedAt = baseTime.AddMinutes(-i)
             });
         }
@@ -293,7 +293,7 @@ public class ContactServiceTests : IDisposable
         // Assert
         var resultList = result.ToList();
         Assert.Equal(10, resultList.Count);
-        Assert.Equal("User 1", resultList.First().FullName);
+        Assert.Equal("User 1", resultList.First().FullName); 
         Assert.Equal("User 10", resultList.Last().FullName);
     }
 
@@ -466,7 +466,7 @@ public class ContactServiceTests : IDisposable
         Func<Task> act = async () => await _contactService.DeleteContactFileAsync(contact.Id, 999);
         await Assert.ThrowsAsync<NotFoundException>(act);
     }
-
+    
     [Fact]
     public void UpdateContactStatusAsync_Should_Invalidate_List_Cache_If_Implemented()
     {

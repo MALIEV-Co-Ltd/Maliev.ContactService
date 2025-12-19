@@ -21,7 +21,7 @@ public class ContactDbContext : DbContext
     /// Gets or sets the DbSet for ContactMessage entities.
     /// </summary>
     public DbSet<ContactMessage> ContactMessages { get; set; }
-
+    
     /// <summary>
     /// Gets or sets the DbSet for ContactFile entities.
     /// </summary>

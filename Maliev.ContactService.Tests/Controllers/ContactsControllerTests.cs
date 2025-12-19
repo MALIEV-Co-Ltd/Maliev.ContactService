@@ -370,12 +370,12 @@ public class ContactsControllerTests
         };
 
         _contactServiceMock.Setup(x => x.GetContactFileByIdAsync(id, fileId))
-            .Callback<int, int>((contactId, fileId) =>
+            .Callback<int, int>((contactId, fileId) => 
                 Console.WriteLine($"GetContactFileByIdAsync called with contactId: {contactId}, fileId: {fileId}"))
             .ReturnsAsync(file);
 
         _uploadServiceMock.Setup(x => x.DownloadFileAsync("upload-123"))
-            .Callback<string>(fileId =>
+            .Callback<string>(fileId => 
                 Console.WriteLine($"DownloadFileAsync called with fileId: {fileId}"))
             .ReturnsAsync(downloadResponse);
 

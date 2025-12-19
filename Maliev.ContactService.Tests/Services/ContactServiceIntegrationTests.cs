@@ -237,7 +237,7 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
                 Email = $"user{i}@example.com",
                 Subject = $"Subject {i}",
                 Message = $"Message {i}",
-                CountryId = 1,
+            CountryId = 1,
                 ContactType = i % 2 == 0 ? ContactType.General : ContactType.Business,
                 Priority = Priority.Medium,
                 Status = ContactStatus.New,
@@ -255,7 +255,7 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
         // Assert
         var resultList = result.ToList();
         Assert.Equal(10, resultList.Count);
-
+        
         // The ordering should be by CreatedAt descending (most recent first)
         // User 1 has the most recent CreatedAt timestamp (baseTime.AddMinutes(-1)), so it should be first
         Assert.Equal("User 1", resultList.First().FullName);

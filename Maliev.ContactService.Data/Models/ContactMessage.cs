@@ -116,12 +116,12 @@ public enum ContactType
     /// General inquiry or question.
     /// </summary>
     General = 0,
-
+    
     /// <summary>
     /// Supplier-related inquiry.
     /// </summary>
     Supplier = 1,
-
+    
     /// <summary>
     /// Business partnership or collaboration inquiry.
     /// </summary>
@@ -137,17 +137,17 @@ public enum Priority
     /// Low priority - can be addressed when convenient.
     /// </summary>
     Low = 0,
-
+    
     /// <summary>
     /// Medium priority - standard response time.
     /// </summary>
     Medium = 1,
-
+    
     /// <summary>
     /// High priority - requires prompt attention.
     /// </summary>
     High = 2,
-
+    
     /// <summary>
     /// Urgent - requires immediate attention.
     /// </summary>
@@ -163,17 +163,17 @@ public enum ContactStatus
     /// New message that hasn't been reviewed yet.
     /// </summary>
     New = 0,
-
+    
     /// <summary>
     /// Message is currently being processed.
     /// </summary>
     InProgress = 1,
-
+    
     /// <summary>
     /// Message has been resolved.
     /// </summary>
     Resolved = 2,
-
+    
     /// <summary>
     /// Message has been closed and archived.
     /// </summary>

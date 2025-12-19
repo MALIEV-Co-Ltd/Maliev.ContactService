@@ -9,7 +9,7 @@ public interface IAuditable
     /// Gets or sets the timestamp when the entity was created.
     /// </summary>
     DateTimeOffset CreatedAt { get; set; }
-
+    
     /// <summary>
     /// Gets or sets the timestamp when the entity was last updated.
     /// </summary>
