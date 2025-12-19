@@ -139,7 +139,7 @@ RUN --mount=type=secret,id=nuget_username \
     NUGET_PASSWORD=$(cat /run/secrets/nuget_password) \
     dotnet restore "Maliev.Service.Api/Maliev.Service.Api.csproj"
 COPY . .
-WORKDIR "/Maliev.Service.Api"
+WORKDIR "/src/Maliev.Service.Api"
 RUN dotnet publish -c Release -o /app/publish
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
