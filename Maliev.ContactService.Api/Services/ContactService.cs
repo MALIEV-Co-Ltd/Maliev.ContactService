@@ -50,7 +50,12 @@ public class ContactService : IContactService
         if (request == null) throw new ArgumentNullException(nameof(request));
 
         var sixtySecondsAgo = DateTimeOffset.UtcNow.AddSeconds(-60);
-        if (await _context.ContactMessages.AnyAsync(c => c.Email == request.Email && c.CreatedAt > sixtySecondsAgo))
+        var strategy = _context.Database.CreateExecutionStrategy();
+
+        var isDuplicate = await strategy.ExecuteAsync(async () =>
+            await _context.ContactMessages.AnyAsync(c => c.Email == request.Email && c.CreatedAt > sixtySecondsAgo));
+
+        if (isDuplicate)
         {
             _logger.LogWarning("Duplicate inquiry detected for email {Email} within 60 seconds", request.Email);
             throw new DuplicateInquiryException();
@@ -64,7 +69,6 @@ public class ContactService : IContactService
 
         _logger.LogInformation("Creating contact inquiry for {Email} with country ID {CountryId}", request.Email, request.CountryId);
 
-        var strategy = _context.Database.CreateExecutionStrategy();
         var createdMessage = await strategy.ExecuteAsync(async () =>
         {
             using var transaction = _context.Database.ProviderName != "Microsoft.EntityFrameworkCore.InMemory" ? await _context.Database.BeginTransactionAsync() : null;

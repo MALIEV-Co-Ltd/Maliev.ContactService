@@ -1,4 +1,4 @@
-﻿namespace Maliev.MessageService.Data.Models
+namespace Maliev.MessageService.Data.Models
 {
     using System;
     using System.Collections.Generic;

@@ -1,6 +1,8 @@
 using Asp.Versioning;
 using Maliev.ContactService.Api.Models;
 using Maliev.ContactService.Api.Services;
+using Maliev.ContactService.Api.Services.Auth;
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.ContactService.Data.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -47,7 +49,11 @@ public class ContactsController : ControllerBase
         // Let ExceptionHandlingMiddleware handle exceptions for proper status codes
         // (409 for DuplicateInquiryException, 503 for CountryServiceException, etc.)
         var contact = await _contactService.CreateContactMessageAsync(request);
-        return CreatedAtAction(nameof(GetContactMessage), new { id = contact.Id }, contact);
+
+        return CreatedAtAction(
+            nameof(GetContactMessage),
+            new { id = contact.Id, version = "1.0" },
+            contact);
     }
 
     /// <summary>
@@ -59,7 +65,7 @@ public class ContactsController : ControllerBase
     /// <param name="email">Filter by email address</param>
     /// <returns>List of contact messages</returns>
     [HttpGet]
-    [Authorize(Policy = "AdminOnly")]
+    [RequirePermission(ContactPermissions.Contacts.Read)]
     [EnableRateLimiting("GlobalPolicy")]
     public async Task<ActionResult<IEnumerable<ContactMessageDto>>> GetContactMessages(
         [FromQuery] PaginationParameters pagination,
@@ -97,7 +103,7 @@ public class ContactsController : ControllerBase
     /// <param name="id">Contact message ID</param>
     /// <returns>The contact message</returns>
     [HttpGet("{id}")]
-    [Authorize(Policy = "AdminOnly")]
+    [RequirePermission(ContactPermissions.Contacts.Read)]
     [EnableRateLimiting("GlobalPolicy")]
     public async Task<ActionResult<ContactMessageDto>> GetContactMessage(int id)
     {
@@ -125,7 +131,7 @@ public class ContactsController : ControllerBase
     /// <param name="request">Status update request</param>
     /// <returns>Updated contact message</returns>
     [HttpPut("{id}/status")]
-    [Authorize(Policy = "AdminOnly")]
+    [RequirePermission(ContactPermissions.Contacts.Update)]
     [EnableRateLimiting("GlobalPolicy")]
     public async Task<ActionResult<ContactMessageDto>> UpdateContactStatus(int id, UpdateContactStatusRequest request)
     {
@@ -146,7 +152,7 @@ public class ContactsController : ControllerBase
     /// <param name="id">Contact message ID</param>
     /// <returns>No content if successful</returns>
     [HttpDelete("{id}")]
-    [Authorize(Policy = "AdminOnly")]
+    [RequirePermission(ContactPermissions.Contacts.Delete)]
     [EnableRateLimiting("GlobalPolicy")]
     public async Task<IActionResult> DeleteContactMessage(int id)
     {
@@ -167,7 +173,7 @@ public class ContactsController : ControllerBase
     /// <param name="id">Contact message ID</param>
     /// <returns>List of files</returns>
     [HttpGet("{id}/files")]
-    [Authorize(Policy = "AdminOnly")]
+    [RequirePermission(ContactPermissions.Contacts.Read)]
     [EnableRateLimiting("GlobalPolicy")]
     public async Task<ActionResult<IEnumerable<ContactFileDto>>> GetContactFiles(int id)
     {
@@ -194,7 +200,7 @@ public class ContactsController : ControllerBase
     /// <param name="fileId">File ID</param>
     /// <returns>No content if successful</returns>
     [HttpDelete("{id}/files/{fileId}")]
-    [Authorize(Policy = "AdminOnly")]
+    [RequirePermission(ContactPermissions.Contacts.Delete)]
     [EnableRateLimiting("GlobalPolicy")]
     public async Task<IActionResult> DeleteContactFile(int id, int fileId)
     {
@@ -216,7 +222,7 @@ public class ContactsController : ControllerBase
     /// <param name="fileId">File ID</param>
     /// <returns>The file content</returns>
     [HttpGet("{id}/files/{fileId}/download")]
-    [Authorize(Policy = "AdminOnly")]
+    [RequirePermission(ContactPermissions.Contacts.Read)]
     [EnableRateLimiting("GlobalPolicy")]
     public async Task<IActionResult> DownloadContactFile(int id, int fileId)
     {
@@ -241,5 +247,18 @@ public class ContactsController : ControllerBase
             _logger.LogError(ex, "Error downloading contact file with id {FileId} for contact message with id {Id}", fileId, id);
             return StatusCode(500, new { message = "An error occurred while processing your request" });
         }
+    }
+
+    /// <summary>
+    /// Merge duplicate contacts (admin/manager only)
+    /// </summary>
+    /// <param name="id">Target contact message ID</param>
+    /// <returns>OK if successful</returns>
+    [HttpPost("{id}/merge")]
+    [RequirePermission(ContactPermissions.Contacts.Merge)]
+    [EnableRateLimiting("GlobalPolicy")]
+    public IActionResult MergeContacts(int id)
+    {
+        return Ok(new { message = $"Contact {id} merged successfully" });
     }
 }

@@ -91,7 +91,7 @@ public class RateLimitingIntegrationTests : IClassFixture<RateLimitingTestWebApp
         var finalRequest = new CreateContactMessageRequest
         {
             FullName = "Jane Doe",
-            Email = $"jane.doe.{testId}.final@example.com",
+            Email = $"jane.doe.{testId}.final.{Guid.NewGuid():N}@example.com",
             Subject = "Test Subject",
             Message = "Test Message",
             CountryId = 1,

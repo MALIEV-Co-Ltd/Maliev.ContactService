@@ -22,6 +22,13 @@ public class RateLimitingTestWebApplicationFactory : BaseIntegrationTestFactory<
 
     protected override string HostEnvironmentName => "RateLimitTesting";
 
+    protected override void ConfigureEnvironmentVariables()
+    {
+        base.ConfigureEnvironmentVariables();
+        // Enable permission-based auth in tests
+        Environment.SetEnvironmentVariable("Features__PermissionBasedAuthEnabled", "true");
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         // Set JWT configuration for RateLimitTesting environment (Extensions.Authentication.cs needs this)
@@ -43,6 +50,7 @@ public class RateLimitingTestWebApplicationFactory : BaseIntegrationTestFactory<
         base.ConfigureWebHost(builder);
 
         // Configure rate limiting settings
+        builder.UseSetting("AuditLog:Enabled", "false");
         builder.ConfigureAppConfiguration((context, config) =>
         {
             var dict = new Dictionary<string, string?>

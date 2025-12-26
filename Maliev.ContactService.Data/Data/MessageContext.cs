@@ -1,4 +1,4 @@
-﻿namespace Maliev.MessageService.Data.Data
+namespace Maliev.MessageService.Data.Data
 {
     using System;
     using Microsoft.EntityFrameworkCore;
