@@ -28,6 +28,26 @@ public class ContactDbContext : DbContext
     public DbSet<ContactFile> ContactFiles { get; set; }
 
     /// <summary>
+    /// Gets or sets the DbSet for Permission entities.
+    /// </summary>
+    public DbSet<Permission> Permissions { get; set; }
+
+    /// <summary>
+    /// Gets or sets the DbSet for Role entities.
+    /// </summary>
+    public DbSet<Role> Roles { get; set; }
+
+    /// <summary>
+    /// Gets or sets the DbSet for RolePermission entities.
+    /// </summary>
+    public DbSet<RolePermission> RolePermissions { get; set; }
+
+    /// <summary>
+    /// Gets or sets the DbSet for AuditLog entities.
+    /// </summary>
+    public DbSet<AuditLog> AuditLogs { get; set; }
+
+    /// <summary>
     /// Saves all changes made in this context to the database.
     /// </summary>
     /// <returns>The number of state entries written to the database.</returns>
@@ -182,6 +202,57 @@ public class ContactDbContext : DbContext
 
             // Index for foreign key
             entity.HasIndex(e => e.ContactMessageId);
+        });
+
+        // Configure Permission entity
+        modelBuilder.Entity<Permission>(entity =>
+        {
+            entity.ToTable("Permissions");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Category).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.HasIndex(e => e.Name).IsUnique();
+        });
+
+        // Configure Role entity
+        modelBuilder.Entity<Role>(entity =>
+        {
+            entity.ToTable("Roles");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.HasIndex(e => e.Name).IsUnique();
+        });
+
+        // Configure RolePermission entity
+        modelBuilder.Entity<RolePermission>(entity =>
+        {
+            entity.ToTable("RolePermissions");
+            entity.HasKey(rp => new { rp.RoleId, rp.PermissionId });
+
+            entity.HasOne(rp => rp.Role)
+                .WithMany(r => r.RolePermissions)
+                .HasForeignKey(rp => rp.RoleId);
+
+            entity.HasOne(rp => rp.Permission)
+                .WithMany(p => p.RolePermissions)
+                .HasForeignKey(rp => rp.PermissionId);
+        });
+
+        // Configure AuditLog entity
+        modelBuilder.Entity<AuditLog>(entity =>
+        {
+            entity.ToTable("AuditLogs");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.UserId).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Action).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Resource).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.ClientIp).HasMaxLength(50);
+            entity.Property(e => e.Reason).HasMaxLength(500);
+            
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.Timestamp);
         });
 
         // Apply PostgreSQL snake_case naming convention globally

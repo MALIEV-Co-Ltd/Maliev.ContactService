@@ -18,6 +18,13 @@ public class RateLimitingTestWebApplicationFactory : BaseIntegrationTestFactory<
         _testRsa = RSA.Create(2048);
     }
 
+    protected override void ConfigureEnvironmentVariables()
+    {
+        base.ConfigureEnvironmentVariables();
+        // Enable permission-based auth in tests
+        Environment.SetEnvironmentVariable("Features__PermissionBasedAuthEnabled", "true");
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         // Set environment to "RateLimitTesting" BEFORE calling base
@@ -36,6 +43,7 @@ public class RateLimitingTestWebApplicationFactory : BaseIntegrationTestFactory<
         base.ConfigureWebHost(builder);
 
         // Configure rate limiting settings
+        builder.UseSetting("AuditLog:Enabled", "false");
         builder.UseSetting("RateLimiting:FixedWindow:PermitLimit", "5");
         builder.UseSetting("RateLimiting:FixedWindow:Window", "00:00:10");
         builder.UseSetting("RateLimiting:GlobalFixedWindow:PermitLimit", "20");

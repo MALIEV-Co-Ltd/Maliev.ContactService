@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Maliev.ContactService.Api.Models;
+using Maliev.ContactService.Api.Services.Auth;
 using Maliev.ContactService.Data.Models;
 using Microsoft.AspNetCore.Mvc.Testing;
 
@@ -25,7 +26,8 @@ public class ContactsControllerIntegrationTests : IClassFixture<CustomWebApplica
     {
         // The factory and its database container are initialized here
         await _factory.InitializeAsync();
-        _client = _factory.CreateAuthenticatedClient("test-user", new[] { "Admin" });
+        var permissions = ContactPredefinedRoles.GetPermissionsForRole(ContactPredefinedRoles.Admin).ToArray();
+        _client = _factory.CreateAuthenticatedClient("test-user", new[] { ContactPredefinedRoles.Admin }, permissions);
     }
 
     public async Task DisposeAsync()

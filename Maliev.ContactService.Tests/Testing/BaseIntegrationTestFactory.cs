@@ -1,4 +1,4 @@
-﻿using System.IdentityModel.Tokens.Jwt;
+using System.IdentityModel.Tokens.Jwt;
 using MassTransit;
 using Microsoft.Extensions.Configuration;
 using System.Security.Claims;
@@ -89,11 +89,34 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         // Apply database migrations
         await ApplyMigrationsAsync();
 
+        // Seed authorization data using a fresh context to avoid recursive loop via Services property
+        await using (var dbContext = CreateDbContext())
+        {
+            if (dbContext is Maliev.ContactService.Data.DbContexts.ContactDbContext contactDbContext)
+            {
+                await Maliev.ContactService.Api.Services.Auth.DataSeeder.SeedAuthDataAsync(contactDbContext);
+            }
+        }
+
         _containersStarted = true;
     }
 
     public new async Task DisposeAsync()
     {
+        // Stop background services first to avoid them trying to access databases during container shutdown
+        try
+        {
+            var hostedServices = Services.GetServices<IHostedService>();
+            foreach (var service in hostedServices)
+            {
+                if (service is Maliev.ContactService.Api.Services.Auth.AuditLogBackgroundService)
+                {
+                    await service.StopAsync(CancellationToken.None);
+                }
+            }
+        }
+        catch (ObjectDisposedException) { }
+
         await _postgresContainer.DisposeAsync();
         await _redisContainer.DisposeAsync();
         await _rabbitmqContainer.DisposeAsync();
@@ -121,6 +144,10 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         Environment.SetEnvironmentVariable("JWT_PUBLIC_KEY_MODULUS", Convert.ToBase64String(rsaParams.Modulus!));
         Environment.SetEnvironmentVariable("JWT_PUBLIC_KEY_EXPONENT", Convert.ToBase64String(rsaParams.Exponent!));
 
+        // Also set the format expected by some Aspire helpers (raw base64 of public key info)
+        var keyBytes = _testRsa.ExportSubjectPublicKeyInfo();
+        Environment.SetEnvironmentVariable("Authentication__Jwt__PublicKey", Convert.ToBase64String(keyBytes));
+
         // Allow derived classes to set additional environment variables
         ConfigureEnvironmentVariables();
 
@@ -129,11 +156,24 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        builder.UseSetting("AuditLog:Enabled", "false");
+        builder.ConfigureAppConfiguration((context, config) =>
+        {
+            config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Service:Name"] = "ContactService",
+                ["Service:Version"] = "1.0.0-test"
+            });
+        });
+
         builder.ConfigureTestServices(services =>
         {
             // Configure JWT Bearer authentication with test RSA key
-            services.PostConfigureAll<Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerOptions>(options =>
+            services.PostConfigureAll<JwtBearerOptions>(options =>
             {
+                // Disable claim type mapping to keep original claim names like "sub" instead of URIs
+                options.MapInboundClaims = false;
+
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,
@@ -143,7 +183,9 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
                     ValidIssuer = "test-issuer",
                     ValidAudience = "test-audience",
                     IssuerSigningKey = new RsaSecurityKey(_testRsa),
-                    ClockSkew = TimeSpan.Zero // No clock skew for tests
+                    ClockSkew = TimeSpan.Zero, // No clock skew for tests
+                    NameClaimType = "sub",
+                    RoleClaimType = "role"
                 };
             });
 
@@ -166,8 +208,8 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
     protected virtual void ConfigureEnvironmentVariables()
     {
         // Set dummy URLs for external services to prevent constructor injection failures
-        Environment.SetEnvironmentVariable("ExternalServices__CountryService__BaseUrl", "http://localhost:5000");
-        Environment.SetEnvironmentVariable("ExternalServices__UploadService__BaseUrl", "http://localhost:5001");
+        Environment.SetEnvironmentVariable("CountryService__BaseUrl", "http://localhost:5000");
+        Environment.SetEnvironmentVariable("UploadService__BaseUrl", "http://localhost:5001");
     }
 
     /// <summary>
@@ -176,7 +218,7 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
     protected virtual void ConfigureAdditionalServices(IServiceCollection services)
     {
         // Mock external services to prevent HTTP calls during tests
-        
+
         // Mock CountryService
         var mockCountryService = new Mock<ICountryServiceClient>();
         mockCountryService.Setup(x => x.ValidateCountryExistsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
@@ -186,17 +228,17 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         // Mock UploadService
         var mockUploadService = new Mock<IUploadServiceClient>();
         mockUploadService.Setup(x => x.UploadFileAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<string>()))
-             .ReturnsAsync(new UploadResponse 
-             { 
-                 FileId = "test-file-id", 
-                 FileSize = 100, 
-                 ObjectName = "test-object", 
-                 Bucket = "test-bucket", 
-                 UploadedAt = DateTime.UtcNow 
+             .ReturnsAsync(new UploadResponse
+             {
+                 FileId = "test-file-id",
+                 FileSize = 100,
+                 ObjectName = "test-object",
+                 Bucket = "test-bucket",
+                 UploadedAt = DateTime.UtcNow
              });
         mockUploadService.Setup(x => x.DeleteFileAsync(It.IsAny<string>()))
              .ReturnsAsync(true);
-             
+
         services.AddScoped(_ => mockUploadService.Object);
     }
 
@@ -244,7 +286,7 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
                   FROM information_schema.tables
                   WHERE table_schema = 'public'
                   AND table_type = 'BASE TABLE'
-                  AND table_name != '__EFMigrationsHistory'
+                  AND table_name != '__EFMigrationsHistory' 
                   ORDER BY table_name")
             .ToListAsync();
 
@@ -295,13 +337,21 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
     /// <summary>
     /// Creates a test JWT token for authentication in integration tests.
     /// </summary>
-    /// <param name="userId">User ID to include in token</param>
-    /// <param name="roles">Roles to include in token claims</param>
-    /// <param name="additionalClaims">Additional claims to include</param>
-    /// <returns>JWT token string</returns>
     public string CreateTestJwtToken(
         string userId = "test-user",
         string[]? roles = null,
+        Dictionary<string, string>? additionalClaims = null)
+    {
+        return CreateTestJwtToken(userId, roles, null, additionalClaims);
+    }
+
+    /// <summary>
+    /// Creates a test JWT token with support for multi-value claims like permissions.
+    /// </summary>
+    public string CreateTestJwtToken(
+        string userId,
+        string[]? roles,
+        string[]? permissions,
         Dictionary<string, string>? additionalClaims = null)
     {
         var claims = new List<Claim>
@@ -314,7 +364,15 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         {
             foreach (var role in roles)
             {
-                claims.Add(new Claim(ClaimTypes.Role, role));
+                claims.Add(new Claim("role", role));
+            }
+        }
+
+        if (permissions != null)
+        {
+            foreach (var permission in permissions)
+            {
+                claims.Add(new Claim("permissions", permission));
             }
         }
 
@@ -350,13 +408,13 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
     }
 
     /// <summary>
-    /// Creates an HTTP client with authenticated user and specified roles.
+    /// Creates an HTTP client with authenticated user and specified roles and permissions.
     /// </summary>
-    public HttpClient CreateAuthenticatedClient(string userId = "test-user", string[]? roles = null)
+    public HttpClient CreateAuthenticatedClient(string userId = "test-user", string[]? roles = null, string[]? permissions = null)
     {
-        var token = CreateTestJwtToken(userId, roles);
+        var token = CreateTestJwtToken(userId, roles, permissions);
         var client = CreateClient();
-        client.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
         return client;
     }
 }

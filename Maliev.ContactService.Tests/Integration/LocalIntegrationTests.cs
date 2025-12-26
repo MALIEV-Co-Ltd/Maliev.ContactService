@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Maliev.ContactService.Api.Exceptions;
 using Maliev.ContactService.Api.Models;
 using Maliev.ContactService.Api.Services;
+using Maliev.ContactService.Api.Services.Auth;
 using Maliev.ContactService.Data.DbContexts;
 using Maliev.ContactService.Data.Models;
 using Maliev.ContactService.Tests.Services;
@@ -341,6 +342,13 @@ public class LocalIntegrationTests : IClassFixture<CustomWebApplicationFactory<P
         // Create a new factory instance with failing country service
         var factoryWithFailingService = _factory.WithWebHostBuilder(builder =>
         {
+            builder.UseEnvironment("Testing");
+            var jwtKey = Environment.GetEnvironmentVariable("Authentication__Jwt__PublicKey");
+            if (!string.IsNullOrEmpty(jwtKey))
+            {
+                builder.UseSetting("Authentication:Jwt:PublicKey", jwtKey);
+            }
+
             builder.ConfigureServices(services =>
             {
                 // Remove all existing ICountryServiceClient registrations
@@ -358,9 +366,10 @@ public class LocalIntegrationTests : IClassFixture<CustomWebApplicationFactory<P
         });
 
         // Create an authenticated client from the modified factory
-        var token = _factory.CreateTestJwtToken("test-user", new[] { "Admin" });
+        var adminPerms = ContactPredefinedRoles.GetPermissionsForRole(ContactPredefinedRoles.Admin).ToArray();
+        var token = _factory.CreateTestJwtToken("test-user", new[] { ContactPredefinedRoles.Admin }, adminPerms);
         var client = factoryWithFailingService.CreateClient();
-        client.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
         return client;
     }
 

@@ -2,10 +2,17 @@
 using Maliev.ContactService.Api.Middleware;
 using Maliev.ContactService.Api.Models;
 using Maliev.ContactService.Api.Services;
+using Maliev.ContactService.Api.Services.Auth;
 using Maliev.ContactService.Data.DbContexts;
+using Maliev.Aspire.ServiceDefaults;
+using Maliev.Aspire.ServiceDefaults.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Options;
 using System.Threading.RateLimiting;
+
+using System.Threading.Channels;
+using Maliev.ContactService.Data.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,13 +21,17 @@ builder.AddGoogleSecretManagerVolume(); // Load secrets from /mnt/secrets if ava
 
 // --- Infrastructure & Observability ---
 builder.AddServiceDefaults(); // OpenTelemetry, health checks, resilience
-builder.AddServiceMeters("contacts-meter"); // Register service meters for OpenTelemetry business metrics
+builder.AddStandardMiddleware(options =>
+{
+    options.EnableRequestLogging = true;
+});
+builder.AddServiceMeters("contacts-meter", "Maliev.ContactService.Auth"); // Register service meters
 
 // Add Redis, MassTransit, and PostgreSQL DbContext
 // In testing, the test configuration provides Testcontainers connection strings
 builder.AddRedisDistributedCache(instanceName: "contact:"); // Redis with in-memory fallback
 builder.AddMassTransitWithRabbitMq(); // RabbitMQ message bus (non-blocking startup)
-builder.AddPostgresDbContext<ContactDbContext>(connectionStringName: "ContactDbContext"); // PostgreSQL with retry logic
+builder.AddPostgresDbContext<ContactDbContext>(connectionName: "ContactDbContext"); // PostgreSQL with retry logic
 
 // --- API Configuration ---
 builder.AddDefaultCors(); // CORS from CORS:AllowedOrigins config
@@ -29,26 +40,28 @@ builder.AddDefaultApiVersioning(); // API versioning with URL segment reader
 // JWT Authentication (tests override via PostConfigureAll with dynamic RSA keys)
 builder.AddJwtAuthentication();
 
-builder.Services.AddAuthorization(options =>
+// --- Authorization & Permissions ---
+builder.Services.AddSingleton<IAuthMetrics, Maliev.ContactService.Api.Services.Auth.AuthMetricsService>();
+builder.Services.AddPermissionAuthorization();
+
+var auditLogEnabled = builder.Configuration.GetValue("AuditLog:Enabled", true);
+if (auditLogEnabled)
 {
-    options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
-    options.AddPolicy("UserOnly", policy => policy.RequireRole("User"));
-});
+    builder.Services.AddSingleton(System.Threading.Channels.Channel.CreateUnbounded<AuditLog>());
+    builder.Services.AddHostedService<AuditLogBackgroundService>();
+    builder.Services.AddSingleton<IAuditLogService, AuditLogService>();
+}
+else
+{
+    builder.Services.AddSingleton<IAuditLogService, NoOpAuditLogService>();
+}
 
 // Add OpenAPI (must be in Program.cs for XML comments to work via source generator)
 if (!builder.Environment.IsProduction())
 {
-    builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddOpenApi("v1", options =>
-    {
-        options.AddDocumentTransformer((document, context, cancellationToken) =>
-        {
-            document.Info.Title = "MALIEV Contact Service API";
-            document.Info.Version = "v1";
-            document.Info.Description = "Customer contact management service. Handles contact form submissions with file attachments, message status tracking (new/in-progress/resolved), and administrative tools for viewing, updating, and managing customer inquiries.";
-            return Task.CompletedTask;
-        });
-    });
+    builder.AddStandardOpenApi(
+        title: "MALIEV Contact Service API",
+        description: "Customer contact management service. Handles contact form submissions with file attachments, message status tracking (new/in-progress/resolved), and administrative tools for viewing, updating, and managing customer inquiries.");
 }
 
 // Configure FormOptions for multipart body length limit (250MB)
@@ -86,15 +99,17 @@ if (!builder.Environment.IsEnvironment("Testing"))
     });
 }
 
-// Configure UploadService options
-builder.Services.Configure<UploadServiceOptions>(builder.Configuration.GetSection(UploadServiceOptions.SectionName));
-builder.Services.AddHttpClient<IUploadServiceClient, UploadServiceClient>()
-    .AddStandardResilienceHandler();
+// Configure UploadService HTTP client
+builder.AddServiceClient<IUploadServiceClient, UploadServiceClient>("UploadService");
 
-// Configure CountryService options and HTTP client
-builder.Services.Configure<CountryServiceOptions>(builder.Configuration.GetSection(CountryServiceOptions.SectionName));
-builder.Services.AddHttpClient<ICountryServiceClient, CountryServiceClient>()
-    .AddStandardResilienceHandler();
+// Configure CountryService HTTP client
+builder.AddServiceClient<ICountryServiceClient, CountryServiceClient>("CountryService");
+
+// Configure IAM Service Client
+builder.Services.AddIAMClient(builder.Configuration, "ContactService");
+
+// IAM Registration Service
+builder.Services.AddIAMRegistration<ContactIAMRegistrationService>();
 
 // Register application services
 builder.Services.AddScoped<IContactService, ContactService>();
@@ -110,10 +125,15 @@ if (!app.Environment.IsEnvironment("Testing"))
     try
     {
         await app.MigrateDatabaseAsync<ContactDbContext>();
+        
+        // Seed authorization data
+        using var scope = app.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ContactDbContext>();
+        await DataSeeder.SeedAuthDataAsync(dbContext);
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, "Database migration failed - application may not function correctly");
+        logger.LogError(ex, "Database migration or seeding failed - application may not function correctly");
         // Don't throw - allow app to start for debugging
     }
 }
@@ -121,7 +141,12 @@ if (!app.Environment.IsEnvironment("Testing"))
 // Configure middleware pipeline
 app.UseForwardedHeaders();
 app.UseHttpsRedirection();
-app.UseMiddleware<ExceptionHandlingMiddleware>();
+app.UseStandardMiddleware();
+
+if (!app.Environment.IsEnvironment("RateLimitTesting"))
+{
+    app.UseMiddleware<AuditLogMiddleware>();
+}
 
 if (!app.Environment.IsEnvironment("Testing"))
 {

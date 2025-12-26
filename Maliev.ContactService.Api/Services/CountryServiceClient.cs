@@ -12,23 +12,16 @@ public class CountryServiceClient : ICountryServiceClient
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<CountryServiceClient> _logger;
-    private readonly CountryServiceOptions _options;
     /// <summary>
     /// Initializes a new instance of the <see cref="CountryServiceClient"/> class.
     /// </summary>
 
     public CountryServiceClient(
         HttpClient httpClient,
-        ILogger<CountryServiceClient> logger,
-        IOptions<CountryServiceOptions> options)
+        ILogger<CountryServiceClient> logger)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
-
-        // Configure base address and timeout
-        _httpClient.BaseAddress = new Uri(_options.BaseUrl);
-        _httpClient.Timeout = TimeSpan.FromSeconds(_options.TimeoutInSeconds);
     }
     /// <summary>
     /// Validates  C o u n t r y E x i s t s asynchronously
