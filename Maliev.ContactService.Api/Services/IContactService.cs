@@ -14,14 +14,14 @@ public interface IContactService
     /// <param name="request">The contact message creation request.</param>
     /// <returns>The created contact message.</returns>
     Task<ContactMessageDto> CreateContactMessageAsync(CreateContactMessageRequest request);
-    
+
     /// <summary>
     /// Gets a contact message by its identifier.
     /// </summary>
     /// <param name="id">The contact message identifier.</param>
     /// <returns>The contact message if found, null otherwise.</returns>
     Task<ContactMessageDto?> GetContactMessageByIdAsync(int id);
-    
+
     /// <summary>
     /// Gets a paginated list of contact messages with optional filtering.
     /// </summary>
@@ -37,7 +37,7 @@ public interface IContactService
         ContactStatus? status = null,
         ContactType? contactType = null,
         string? email = null);
-    
+
     /// <summary>
     /// Updates the status of a contact message.
     /// </summary>
@@ -45,21 +45,21 @@ public interface IContactService
     /// <param name="request">The status update request.</param>
     /// <returns>The updated contact message.</returns>
     Task<ContactMessageDto> UpdateContactStatusAsync(int id, UpdateContactStatusRequest request);
-    
+
     /// <summary>
     /// Deletes a contact message.
     /// </summary>
     /// <param name="id">The contact message identifier.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     Task DeleteContactMessageAsync(int id);
-    
+
     /// <summary>
     /// Gets all files associated with a contact message.
     /// </summary>
     /// <param name="contactId">The contact message identifier.</param>
     /// <returns>A collection of contact files.</returns>
     Task<IEnumerable<ContactFileDto>> GetContactFilesAsync(int contactId);
-    
+
     /// <summary>
     /// Gets a specific file by its identifier.
     /// </summary>
@@ -67,7 +67,7 @@ public interface IContactService
     /// <param name="fileId">The file identifier.</param>
     /// <returns>The contact file if found, null otherwise.</returns>
     Task<ContactFileDto?> GetContactFileByIdAsync(int contactId, int fileId);
-    
+
     /// <summary>
     /// Deletes a file from a contact message.
     /// </summary>

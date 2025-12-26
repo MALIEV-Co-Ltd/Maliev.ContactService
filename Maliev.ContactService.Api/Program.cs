@@ -125,7 +125,7 @@ if (!app.Environment.IsEnvironment("Testing"))
     try
     {
         await app.MigrateDatabaseAsync<ContactDbContext>();
-        
+
         // Seed authorization data
         using var scope = app.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<ContactDbContext>();

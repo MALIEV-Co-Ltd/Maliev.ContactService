@@ -32,12 +32,12 @@ public class AuditLogMiddleware
         await _next(context);
 
         // Capture 401 and 403 responses that might not have been logged by PermissionHandler
-        if (context.Response.StatusCode == StatusCodes.Status401Unauthorized || 
+        if (context.Response.StatusCode == StatusCodes.Status401Unauthorized ||
             context.Response.StatusCode == StatusCodes.Status403Forbidden)
         {
             // Avoid double logging if PermissionHandler already logged it (though logging twice is better than not at all)
             // We could use context.Items to flag if it was already logged.
-            
+
             var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "anonymous";
             var action = context.Request.Method + " " + context.Request.Path;
             var resource = context.Request.Path;
@@ -47,9 +47,9 @@ public class AuditLogMiddleware
 
             // Only log if it's a security-related failure that wasn't already explicitly logged by our granular handler
             // For now, simple logging is safer.
-            _logger.LogWarning("Security event detected in middleware: {StatusCode} for {UserId} at {Path}", 
+            _logger.LogWarning("Security event detected in middleware: {StatusCode} for {UserId} at {Path}",
                 context.Response.StatusCode, userId, context.Request.Path);
-                
+
             // We don't necessarily want to spam the DB for every 401 (e.g. bots), 
             // but for 403 it's important.
             if (context.Response.StatusCode == StatusCodes.Status403Forbidden)

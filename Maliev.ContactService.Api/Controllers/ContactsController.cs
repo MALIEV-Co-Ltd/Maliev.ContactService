@@ -49,7 +49,7 @@ public class ContactsController : ControllerBase
         // Let ExceptionHandlingMiddleware handle exceptions for proper status codes
         // (409 for DuplicateInquiryException, 503 for CountryServiceException, etc.)
         var contact = await _contactService.CreateContactMessageAsync(request);
-        
+
         return CreatedAtAction(
             nameof(GetContactMessage),
             new { id = contact.Id, version = "1.0" },

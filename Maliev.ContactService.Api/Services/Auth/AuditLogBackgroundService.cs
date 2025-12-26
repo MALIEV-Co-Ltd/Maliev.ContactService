@@ -51,7 +51,7 @@ public class AuditLogBackgroundService : BackgroundService
                     {
                         using var scope = _serviceProvider.CreateScope();
                         var dbContext = scope.ServiceProvider.GetRequiredService<ContactDbContext>();
-                        
+
                         var strategy = dbContext.Database.CreateExecutionStrategy();
                         await strategy.ExecuteAsync(async () =>
                         {

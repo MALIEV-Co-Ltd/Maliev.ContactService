@@ -23,7 +23,7 @@ public class AuthMetricsService : IAuthMetrics
     {
         var serviceName = configuration["Service:Name"] ?? "ContactService";
         var meter = meterFactory.Create($"{serviceName.ToLower()}-auth-meter");
-        
+
         _defaultTags = new[]
         {
             new KeyValuePair<string, object?>("service_name", serviceName),
