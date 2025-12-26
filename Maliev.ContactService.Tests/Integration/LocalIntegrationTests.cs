@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.Security.Cryptography;
@@ -468,19 +469,20 @@ public class LocalTestWebApplicationFactory : WebApplicationFactory<Program>, IA
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.UseEnvironment("Testing");
-        builder.UseSetting("UseTestcontainers", "true");
 
         EnsureContainerStarted();
 
-        // Set connection string environment variable for Program.cs
-        Environment.SetEnvironmentVariable("ConnectionStrings__ContactDbContext", _connectionString);
-        // Set RabbitMQ connection string (use localhost default for tests)
-        Environment.SetEnvironmentVariable("ConnectionStrings__rabbitmq", "amqp://guest:guest@localhost:5672");
-
-        var publicKeyPem = _rsaKey.ExportRSAPublicKeyPem();
-        var publicKeyBase64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(publicKeyPem));
-        builder.UseSetting("Jwt:PublicKey", publicKeyBase64);
+        // Inject test-specific configuration scoped to this test host
+        builder.ConfigureAppConfiguration((context, config) =>
+        {
+            var dict = new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:ContactDbContext"] = _connectionString,
+                ["ConnectionStrings:rabbitmq"] = "amqp://guest:guest@localhost:5672",
+                ["Jwt:PublicKey"] = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(_rsaKey.ExportRSAPublicKeyPem()))
+            };
+            config.AddInMemoryCollection(dict.Where(kv => kv.Value != null).ToDictionary(kv => kv.Key, kv => (string?)kv.Value));
+        });
 
         builder.ConfigureServices(services =>
         {

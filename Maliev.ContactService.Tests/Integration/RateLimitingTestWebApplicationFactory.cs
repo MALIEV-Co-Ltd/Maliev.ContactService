@@ -1,6 +1,8 @@
 using Maliev.ContactService.Data.DbContexts;
 using Maliev.ContactService.Tests.Testing;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
+using System.Linq;
 using System.Security.Cryptography;
 
 namespace Maliev.ContactService.Tests.Integration;
@@ -18,6 +20,8 @@ public class RateLimitingTestWebApplicationFactory : BaseIntegrationTestFactory<
         _testRsa = RSA.Create(2048);
     }
 
+    protected override string HostEnvironmentName => "RateLimitTesting";
+
     protected override void ConfigureEnvironmentVariables()
     {
         base.ConfigureEnvironmentVariables();
@@ -27,16 +31,19 @@ public class RateLimitingTestWebApplicationFactory : BaseIntegrationTestFactory<
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        // Set environment to "RateLimitTesting" BEFORE calling base
-        // This ensures Program.cs sees the correct environment and enables rate limiting
-        builder.UseEnvironment("RateLimitTesting");
-
         // Set JWT configuration for RateLimitTesting environment (Extensions.Authentication.cs needs this)
         var publicKeyPem = _testRsa.ExportRSAPublicKeyPem();
         var publicKeyBase64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(publicKeyPem));
-        builder.UseSetting("Jwt:PublicKey", publicKeyBase64);
-        builder.UseSetting("Jwt:Issuer", "test-issuer");
-        builder.UseSetting("Jwt:Audience", "test-audience");
+        builder.ConfigureAppConfiguration((context, config) =>
+        {
+            var dict = new Dictionary<string, string?>
+            {
+                ["Jwt:PublicKey"] = publicKeyBase64,
+                ["Jwt:Issuer"] = "test-issuer",
+                ["Jwt:Audience"] = "test-audience"
+            };
+            config.AddInMemoryCollection(dict.Where(kv => kv.Value != null).ToDictionary(kv => kv.Key, kv => (string?)kv.Value));
+        });
 
         // Call base to configure TestContainers and mock services
         // Note: base will call ConfigureTestServices which uses PostConfigureAll to override JWT settings
@@ -44,10 +51,17 @@ public class RateLimitingTestWebApplicationFactory : BaseIntegrationTestFactory<
 
         // Configure rate limiting settings
         builder.UseSetting("AuditLog:Enabled", "false");
-        builder.UseSetting("RateLimiting:FixedWindow:PermitLimit", "5");
-        builder.UseSetting("RateLimiting:FixedWindow:Window", "00:00:10");
-        builder.UseSetting("RateLimiting:GlobalFixedWindow:PermitLimit", "20");
-        builder.UseSetting("RateLimiting:GlobalFixedWindow:Window", "00:00:10");
+        builder.ConfigureAppConfiguration((context, config) =>
+        {
+            var dict = new Dictionary<string, string?>
+            {
+                ["RateLimiting:FixedWindow:PermitLimit"] = "5",
+                ["RateLimiting:FixedWindow:Window"] = "00:00:10",
+                ["RateLimiting:GlobalFixedWindow:PermitLimit"] = "20",
+                ["RateLimiting:GlobalFixedWindow:Window"] = "00:00:10"
+            };
+            config.AddInMemoryCollection(dict.Where(kv => kv.Value != null).ToDictionary(kv => kv.Key, kv => (string?)kv.Value));
+        });
     }
 
     public new async Task DisposeAsync()

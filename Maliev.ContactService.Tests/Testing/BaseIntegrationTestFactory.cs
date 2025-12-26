@@ -3,10 +3,13 @@ using MassTransit;
 using Microsoft.Extensions.Configuration;
 using System.Security.Claims;
 using System.Security.Cryptography;
+using System.Linq;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -57,10 +60,13 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
             .Build();
 
         _testRsa = RSA.Create(2048);
-
-        // Set environment variable EARLY so Program.cs picks it up during WebApplication.CreateBuilder
-        Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Testing");
     }
+
+    /// <summary>
+    /// Override this to change the IHostEnvironment name used for the test host.
+    /// Defaults to "Testing"; derived classes may override to use e.g. "RateLimitTesting".
+    /// </summary>
+    protected virtual string HostEnvironmentName => "Testing";
 
     public async Task InitializeAsync()
     {
@@ -74,11 +80,7 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
             _rabbitmqContainer.StartAsync()
         );
 
-        // Set environment variables immediately after containers start
-        // This ensures they are available when Program.Main runs (which happens when .Server is accessed)
-        Environment.SetEnvironmentVariable($"ConnectionStrings__{DbConnectionStringName}", _postgresContainer.GetConnectionString());
-        Environment.SetEnvironmentVariable("ConnectionStrings__redis", _redisContainer.GetConnectionString());
-        Environment.SetEnvironmentVariable("ConnectionStrings__rabbitmq", _rabbitmqContainer.GetConnectionString());
+        // Connection strings are injected into the test host's configuration via ConfigureWebHost
 
         // Wait for Redis to be ready
         using (var connection = await StackExchange.Redis.ConnectionMultiplexer.ConnectAsync(_redisContainer.GetConnectionString()))
@@ -121,7 +123,6 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         await _redisContainer.DisposeAsync();
         await _rabbitmqContainer.DisposeAsync();
         _testRsa.Dispose();
-        Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", null); // Cleanup
         await base.DisposeAsync();
     }
 
@@ -134,15 +135,8 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
             InitializeAsync().GetAwaiter().GetResult();
         }
 
-        // Set environment variables BEFORE host builder processes configuration
-        // Note: Connection strings are now injected via ConfigureAppConfiguration in ConfigureWebHost
-        // to ensure they are available during host building causing Program.cs to see them.
-
-
-        // Export RSA public key for JWT validation
-        var rsaParams = _testRsa.ExportParameters(false);
-        Environment.SetEnvironmentVariable("JWT_PUBLIC_KEY_MODULUS", Convert.ToBase64String(rsaParams.Modulus!));
-        Environment.SetEnvironmentVariable("JWT_PUBLIC_KEY_EXPONENT", Convert.ToBase64String(rsaParams.Exponent!));
+        // Ensure host runs in the desired test environment (can be overridden by derived classes)
+        builder.UseEnvironment(HostEnvironmentName);
 
         // Also set the format expected by some Aspire helpers (raw base64 of public key info)
         var keyBytes = _testRsa.ExportSubjectPublicKeyInfo();
@@ -151,19 +145,63 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         // Allow derived classes to set additional environment variables
         ConfigureEnvironmentVariables();
 
+        // Inject configuration into the host builder early so Program.cs sees connection strings and other test settings during WebApplication.CreateBuilder
+        builder.ConfigureHostConfiguration(configBuilder =>
+        {
+            var dict = new Dictionary<string, string?>
+            {
+                [$"ConnectionStrings:{DbConnectionStringName}"] = _postgresContainer.GetConnectionString(),
+                ["ConnectionStrings:redis"] = _redisContainer.GetConnectionString(),
+                ["ConnectionStrings:rabbitmq"] = _rabbitmqContainer.GetConnectionString(),
+                ["ExternalServices:CountryService:BaseUrl"] = "http://localhost:5000",
+                ["ExternalServices:UploadService:BaseUrl"] = "http://localhost:5001",
+                ["Jwt:PublicKey"] = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(_testRsa.ExportRSAPublicKeyPem())),
+                ["Jwt:Issuer"] = "test-issuer",
+                ["Jwt:Audience"] = "test-audience",
+                ["UseTestcontainers"] = "true"
+            };
+
+            foreach (var kv in GetAdditionalConfiguration())
+            {
+                dict[kv.Key] = kv.Value;
+            }
+
+            configBuilder.AddInMemoryCollection(dict.Where(kv => kv.Value != null).ToDictionary(kv => kv.Key, kv => (string?)kv.Value));
+        });
+
         return base.CreateHost(builder);
     }
+
+    protected virtual void ConfigureEnvironmentVariables() { }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting("AuditLog:Enabled", "false");
-        builder.ConfigureAppConfiguration((context, config) =>
+
+        // Inject test-specific configuration scoped to the test host
+        builder.ConfigureAppConfiguration((context, configBuilder) =>
         {
-            config.AddInMemoryCollection(new Dictionary<string, string?>
+            var dict = new Dictionary<string, string?>
             {
+                [$"ConnectionStrings:{DbConnectionStringName}"] = _postgresContainer.GetConnectionString(),
+                ["ConnectionStrings:redis"] = _redisContainer.GetConnectionString(),
+                ["ConnectionStrings:rabbitmq"] = _rabbitmqContainer.GetConnectionString(),
+                ["ExternalServices:CountryService:BaseUrl"] = "http://localhost:5000",
+                ["ExternalServices:UploadService:BaseUrl"] = "http://localhost:5001",
+                ["Jwt:PublicKey"] = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(_testRsa.ExportRSAPublicKeyPem())),
+                ["Jwt:Issuer"] = "test-issuer",
+                ["Jwt:Audience"] = "test-audience",
+                ["UseTestcontainers"] = "true",
                 ["Service:Name"] = "ContactService",
                 ["Service:Version"] = "1.0.0-test"
-            });
+            };
+
+            foreach (var kv in GetAdditionalConfiguration())
+            {
+                dict[kv.Key] = kv.Value;
+            }
+
+            configBuilder.AddInMemoryCollection(dict.Where(kv => kv.Value != null).ToDictionary(kv => kv.Key, kv => (string?)kv.Value));
         });
 
         builder.ConfigureTestServices(services =>
@@ -202,14 +240,20 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
     }
 
     /// <summary>
-    /// Override this method to set additional environment variables before host creation.
-    /// Called after standard environment variables are set.
+    /// Override this method to supply additional in-memory configuration for the test host.
+    /// Keys should be configuration keys (e.g., "ExternalServices:CountryService:BaseUrl").
     /// </summary>
-    protected virtual void ConfigureEnvironmentVariables()
+    protected virtual IReadOnlyDictionary<string, string?> GetAdditionalConfiguration()
     {
         // Set dummy URLs for external services to prevent constructor injection failures
         Environment.SetEnvironmentVariable("CountryService__BaseUrl", "http://localhost:5000");
         Environment.SetEnvironmentVariable("UploadService__BaseUrl", "http://localhost:5001");
+
+        return new Dictionary<string, string?>
+        {
+            ["ExternalServices:CountryService:BaseUrl"] = "http://localhost:5000",
+            ["ExternalServices:UploadService:BaseUrl"] = "http://localhost:5001"
+        };
     }
 
     /// <summary>
