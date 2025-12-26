@@ -21,7 +21,7 @@ public class ContactDbContext : DbContext
     /// Gets or sets the DbSet for ContactMessage entities.
     /// </summary>
     public DbSet<ContactMessage> ContactMessages { get; set; }
-    
+
     /// <summary>
     /// Gets or sets the DbSet for ContactFile entities.
     /// </summary>
@@ -250,7 +250,7 @@ public class ContactDbContext : DbContext
             entity.Property(e => e.Resource).IsRequired().HasMaxLength(200);
             entity.Property(e => e.ClientIp).HasMaxLength(50);
             entity.Property(e => e.Reason).HasMaxLength(500);
-            
+
             entity.HasIndex(e => e.UserId);
             entity.HasIndex(e => e.Timestamp);
         });
