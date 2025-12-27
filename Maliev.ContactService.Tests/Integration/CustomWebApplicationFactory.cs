@@ -8,7 +8,5 @@ public class CustomWebApplicationFactory<TProgram> : BaseIntegrationTestFactory<
     protected override void ConfigureEnvironmentVariables()
     {
         base.ConfigureEnvironmentVariables();
-        // Enable permission-based auth in tests
-        Environment.SetEnvironmentVariable("Features__PermissionBasedAuthEnabled", "true");
     }
 }

@@ -25,8 +25,6 @@ public class RateLimitingTestWebApplicationFactory : BaseIntegrationTestFactory<
     protected override void ConfigureEnvironmentVariables()
     {
         base.ConfigureEnvironmentVariables();
-        // Enable permission-based auth in tests
-        Environment.SetEnvironmentVariable("Features__PermissionBasedAuthEnabled", "true");
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
