@@ -54,7 +54,6 @@ jobs:
         run: dotnet build Maliev.ContactService.sln --no-restore --configuration Release
 
       - name: Run tests
-        continue-on-error: true
         run: dotnet test Maliev.ContactService.sln --no-build --configuration Release --verbosity normal
         env:
           ConnectionStrings__ContactDbContext: "Server=localhost;Port=5432;Database=contact_service_test_db;User Id=postgres;Password=postgres;"
