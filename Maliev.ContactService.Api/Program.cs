@@ -1,4 +1,3 @@
-
 using Maliev.ContactService.Api.Middleware;
 using Maliev.ContactService.Api.Models;
 using Maliev.ContactService.Api.Services;
@@ -28,7 +27,6 @@ builder.AddStandardMiddleware(options =>
 builder.AddServiceMeters("contacts-meter", "Maliev.ContactService.Auth"); // Register service meters
 
 // Add Redis, MassTransit, and PostgreSQL DbContext
-// In testing, the test configuration provides Testcontainers connection strings
 builder.AddRedisDistributedCache(instanceName: "contact:"); // Redis with in-memory fallback
 builder.AddMassTransitWithRabbitMq(); // RabbitMQ message bus (non-blocking startup)
 builder.AddPostgresDbContext<ContactDbContext>(connectionName: "ContactDbContext"); // PostgreSQL with retry logic
@@ -70,34 +68,31 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(optio
     options.MultipartBodyLengthLimit = 262144000; // 250MB in bytes
 });
 
-// Configure Rate Limiting (skip in Testing environment)
-if (!builder.Environment.IsEnvironment("Testing"))
+// Configure Rate Limiting
+builder.Services.AddRateLimiter(options =>
 {
-    builder.Services.AddRateLimiter(options =>
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    var rateLimitingConfig = builder.Configuration.GetSection("RateLimiting");
+    var fixedWindowOptions = rateLimitingConfig.GetSection("FixedWindow").Get<FixedWindowRateLimiterOptions>();
+    var globalFixedWindowOptions = rateLimitingConfig.GetSection("GlobalFixedWindow").Get<FixedWindowRateLimiterOptions>();
+
+    if (globalFixedWindowOptions != null)
     {
-        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        options.AddPolicy("GlobalPolicy", context =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                factory: _ => globalFixedWindowOptions));
+    }
 
-        var rateLimitingConfig = builder.Configuration.GetSection("RateLimiting");
-        var fixedWindowOptions = rateLimitingConfig.GetSection("FixedWindow").Get<FixedWindowRateLimiterOptions>();
-        var globalFixedWindowOptions = rateLimitingConfig.GetSection("GlobalFixedWindow").Get<FixedWindowRateLimiterOptions>();
-
-        if (globalFixedWindowOptions != null)
-        {
-            options.AddPolicy("GlobalPolicy", context =>
-                RateLimitPartition.GetFixedWindowLimiter(
-                    partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                    factory: _ => globalFixedWindowOptions));
-        }
-
-        if (fixedWindowOptions != null)
-        {
-            options.AddPolicy("ContactPolicy", context =>
-                RateLimitPartition.GetFixedWindowLimiter(
-                    partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                    factory: _ => fixedWindowOptions));
-        }
-    });
-}
+    if (fixedWindowOptions != null)
+    {
+        options.AddPolicy("ContactPolicy", context =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                factory: _ => fixedWindowOptions));
+    }
+});
 
 // Configure UploadService HTTP client
 builder.AddServiceClient<IUploadServiceClient, UploadServiceClient>("UploadService");
@@ -119,23 +114,14 @@ builder.Services.AddControllers();
 var app = builder.Build();
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 
-// Run database migrations on startup (skip in Testing environment)
-if (!app.Environment.IsEnvironment("Testing"))
-{
-    try
-    {
-        await app.MigrateDatabaseAsync<ContactDbContext>();
+// Run database migrations on startup
+await app.MigrateDatabaseAsync<ContactDbContext>();
 
-        // Seed authorization data
-        using var scope = app.Services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<ContactDbContext>();
-        await DataSeeder.SeedAuthDataAsync(dbContext);
-    }
-    catch (Exception ex)
-    {
-        logger.LogError(ex, "Database migration or seeding failed - application may not function correctly");
-        // Don't throw - allow app to start for debugging
-    }
+// Seed authorization data
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<ContactDbContext>();
+    await DataSeeder.SeedAuthDataAsync(dbContext);
 }
 
 // Configure middleware pipeline
@@ -143,16 +129,8 @@ app.UseForwardedHeaders();
 app.UseHttpsRedirection();
 app.UseStandardMiddleware();
 
-if (!app.Environment.IsEnvironment("RateLimitTesting"))
-{
-    app.UseMiddleware<AuditLogMiddleware>();
-}
-
-if (!app.Environment.IsEnvironment("Testing"))
-{
-    app.UseRateLimiter();
-}
-
+app.UseMiddleware<AuditLogMiddleware>();
+app.UseRateLimiter();
 app.UseCors();
 
 // Authentication & Authorization
