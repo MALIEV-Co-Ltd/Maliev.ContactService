@@ -538,7 +538,7 @@ public class ContactSubmissionTests : IClassFixture<WebApplicationFactory<Progra
     public ContactSubmissionTests(WebApplicationFactory<Program> factory)
     {
         _postgres = new PostgreSqlBuilder()
-            .WithImage("postgres:18")
+            .WithImage("postgres:18-alpine")
             .Build();
 
         _postgres.StartAsync().Wait();
