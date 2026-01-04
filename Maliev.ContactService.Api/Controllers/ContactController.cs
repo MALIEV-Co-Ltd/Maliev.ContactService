@@ -15,21 +15,21 @@ namespace Maliev.ContactService.Api.Controllers;
 /// </summary>
 [ApiController]
 [ApiVersion("1.0")]
-[Route("contact/v{version:apiVersion}/contacts")]
+[Route("contact/v{version:apiVersion}/contact")]
 [Produces("application/json")]
-public class ContactsController : ControllerBase
+public class ContactController : ControllerBase
 {
     private readonly IContactService _contactService;
     private readonly IUploadServiceClient _uploadService;
-    private readonly ILogger<ContactsController> _logger;
+    private readonly ILogger<ContactController> _logger;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="ContactsController"/> class.
+    /// Initializes a new instance of the <see cref="ContactController"/> class.
     /// </summary>
     /// <param name="contactService">The contact service.</param>
     /// <param name="uploadService">The upload service client.</param>
     /// <param name="logger">The logger instance.</param>
-    public ContactsController(IContactService contactService, IUploadServiceClient uploadService, ILogger<ContactsController> logger)
+    public ContactController(IContactService contactService, IUploadServiceClient uploadService, ILogger<ContactController> logger)
     {
         _contactService = contactService;
         _uploadService = uploadService;

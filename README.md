@@ -85,13 +85,13 @@ dotnet ef database update --project Maliev.ContactService.Api
 dotnet run --project Maliev.ContactService.Api
 ```
 
-The service will be available at `http://localhost:5000/contacts`. Access the interactive documentation at `http://localhost:5000/contacts/scalar`.
+The service will be available at `http://localhost:5000/contact`. Access the interactive documentation at `http://localhost:5000/contact/scalar`.
 
 ---
 
 ## 📡 API Endpoints
 
-All endpoints are prefixed with `/contacts/v1/`.
+All endpoints are prefixed with `/contact/v1/`.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -105,9 +105,9 @@ All endpoints are prefixed with `/contacts/v1/`.
 ## 🏥 Health & Monitoring
 
 Standardized health probes for Kubernetes orchestration:
-- **Liveness**: `GET /contacts/liveness`
-- **Readiness**: `GET /contacts/readiness` (Checks DB and Redis connectivity)
-- **Metrics**: `GET /contacts/metrics` (Prometheus format)
+- **Liveness**: `GET /contact/liveness`
+- **Readiness**: `GET /contact/readiness` (Checks DB and Redis connectivity)
+- **Metrics**: `GET /contact/metrics` (Prometheus format)
 
 ---
 
@@ -116,7 +116,6 @@ Standardized health probes for Kubernetes orchestration:
 We prioritize reliable tests over mock-heavy unit tests.
 
 ```bash
-# Run all tests using Testcontainers
 dotnet test --verbosity normal
 ```
 
