@@ -28,7 +28,10 @@ builder.AddServiceMeters("contacts-meter", "Maliev.ContactService.Auth"); // Reg
 
 // Add Redis, MassTransit, and PostgreSQL DbContext
 builder.AddRedisDistributedCache(instanceName: "contact:"); // Redis with in-memory fallback
-builder.AddMassTransitWithRabbitMq(); // RabbitMQ message bus (non-blocking startup)
+builder.AddMassTransitWithRabbitMq(x => 
+{
+    x.AddConsumer<Maliev.ContactService.Api.Consumers.FileDeletedEventConsumer>();
+}); // RabbitMQ message bus (non-blocking startup)
 builder.AddPostgresDbContext<ContactDbContext>(connectionName: "ContactDbContext"); // PostgreSQL with retry logic
 
 // --- API Configuration ---
@@ -112,7 +115,7 @@ builder.Services.AddScoped<IContactService, ContactService>();
 builder.Services.AddControllers();
 
 var app = builder.Build();
-var logger = app.Services.GetRequiredService<ILogger<Program>>();
+var logger = app.Services.GetRequiredService<ILogger<Maliev.ContactService.Api.Program>>();
 
 // Run database migrations on startup
 await app.MigrateDatabaseAsync<ContactDbContext>();
@@ -149,7 +152,10 @@ app.MapApiDocumentation(servicePrefix: "contact");
 logger.LogInformation("ContactService started successfully");
 await app.RunAsync();
 
-/// <summary>
-/// Main program class for the application
-/// </summary>
-public partial class Program { }
+namespace Maliev.ContactService.Api 
+{ 
+    /// <summary>
+    /// Main program class for the application
+    /// </summary>
+    public partial class Program { } 
+}
