@@ -1,5 +1,5 @@
 using Maliev.ContactService.Data.DbContexts;
-using Maliev.MessagingContracts.Contracts;
+using Maliev.MessagingContracts.Generated;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
