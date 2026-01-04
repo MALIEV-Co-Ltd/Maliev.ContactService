@@ -3,7 +3,7 @@
 **Feature**: Contact Submission Service
 **Branch**: `001-contact-service`
 **Date**: 2025-10-29
-**Base Path**: `/contacts/v1`
+**Base Path**: `/contact/v1/contacts`
 
 ## Overview
 
@@ -11,7 +11,7 @@ This document defines the public customer-facing API for submitting contact inqu
 
 ---
 
-## POST /contacts/v1
+## POST /contact/v1/contacts
 
 Submit a new contact inquiry with optional file attachments.
 
@@ -59,7 +59,7 @@ Submit a new contact inquiry with optional file attachments.
 
 **Body (Multipart Form-Data)**:
 ```
-POST /contacts/v1 HTTP/1.1
+POST /contact/v1/contacts HTTP/1.1
 Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
 
 ------WebKitFormBoundary7MA4YWxkTrZu0gW
@@ -218,7 +218,7 @@ Content-Type: application/pdf
 
 **Request**:
 ```bash
-curl -X POST https://api.maliev.com/contacts/v1 \
+curl -X POST https://api.maliev.com/contact/v1/contacts \
   -H "Content-Type: application/json" \
   -d '{
     "fullName": "Jane Smith",
@@ -258,7 +258,7 @@ curl -X POST https://api.maliev.com/contacts/v1 \
 
 **Request**:
 ```bash
-curl -X POST https://api.maliev.com/contacts/v1 \
+curl -X POST https://api.maliev.com/contact/v1/contacts \
   -F "fullName=David Johnson" \
   -F "email=david@techcorp.com" \
   -F "company=TechCorp Industries" \
@@ -313,7 +313,7 @@ curl -X POST https://api.maliev.com/contacts/v1 \
 
 **Request**:
 ```bash
-curl -X POST https://api.maliev.com/contacts/v1 \
+curl -X POST https://api.maliev.com/contact/v1/contacts \
   -H "Content-Type: application/json" \
   -d '{
     "fullName": "Test User",
@@ -343,7 +343,7 @@ curl -X POST https://api.maliev.com/contacts/v1 \
 
 **Request** (11th submission within 1 hour):
 ```bash
-curl -X POST https://api.maliev.com/contacts/v1 \
+curl -X POST https://api.maliev.com/contact/v1/contacts \
   -H "Content-Type: application/json" \
   -d '{ ... }'
 ```
@@ -393,7 +393,7 @@ async function submitContactForm(formData) {
   };
 
   try {
-    const response = await fetch('https://api.maliev.com/contacts/v1', {
+    const response = await fetch('https://api.maliev.com/contact/v1/contacts', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -444,7 +444,7 @@ export function useContactSubmission() {
     setError(null);
 
     try {
-      const response = await fetch('/contacts/v1', {
+      const response = await fetch('/contact/v1/contacts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)

@@ -107,15 +107,15 @@ dotnet run
 
 **Service Endpoints**:
 - API: `http://localhost:5000`
-- API Documentation (Scalar): `http://localhost:5000/contacts/scalar`
-- Health Check (Liveness): `http://localhost:5000/contacts/liveness`
-- Health Check (Readiness): `http://localhost:5000/contacts/readiness`
+- API Documentation (Scalar): `http://localhost:5000/contact/scalar`
+- Health Check (Liveness): `http://localhost:5000/contact/liveness`
+- Health Check (Readiness): `http://localhost:5000/contact/readiness`
 
 ### 5. Test the API
 
 **Submit a Contact Form**:
 ```bash
-curl -X POST http://localhost:5000/contacts/v1 \
+curl -X POST http://localhost:5000/contact/v1/contacts \
   -H "Content-Type: application/json" \
   -d '{
     "fullName": "Test User",
@@ -281,7 +281,7 @@ Integration tests use Testcontainers for PostgreSQL:
 public async Task CreateContact_ValidRequest_SavesToDatabase()
 {
     // Testcontainers handles database lifecycle
-    var response = await _client.PostAsJsonAsync("/contacts/v1", request);
+    var response = await _client.PostAsJsonAsync("/contact/v1/contacts", request);
     response.StatusCode.Should().Be(HttpStatusCode.Created);
 }
 ```
@@ -308,7 +308,7 @@ dotnet format Maliev.ContactService.sln --verify-no-changes
 ### Current Implementation Status
 
 ✅ **Completed Features**:
-- Contact submission endpoint (POST /contacts/v1)
+- Contact submission endpoint (POST /contact/v1/contacts)
 - Admin inquiry management (GET, PUT, DELETE)
 - File upload integration with Upload Service
 - Rate limiting infrastructure
@@ -477,7 +477,7 @@ builder.Services.AddRateLimiter(options =>
 ```bash
 # Submit 11 requests within 1 hour
 for i in {1..11}; do
-  curl -X POST http://localhost:5000/contacts/v1 -H "Content-Type: application/json" -d '{ ... }'
+  curl -X POST http://localhost:5000/contact/v1/contacts -H "Content-Type: application/json" -d '{ ... }'
 done
 
 # 11th should return 429
@@ -562,7 +562,7 @@ public class ContactSubmissionTests : IClassFixture<WebApplicationFactory<Progra
         var request = new CreateContactMessageRequest { /* ... */ };
 
         // Act
-        var response = await _client.PostAsJsonAsync("/contacts/v1", request);
+        var response = await _client.PostAsJsonAsync("/contact/v1/contacts", request);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Created);

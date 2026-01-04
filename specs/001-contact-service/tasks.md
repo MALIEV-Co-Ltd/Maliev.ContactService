@@ -59,7 +59,7 @@ This is a .NET 9 microservice with 3-project structure:
 - [X] T018 [P] Create CountryServiceException in Maliev.ContactService.Api/Exceptions/CountryServiceException.cs for service unavailability
 - [X] T019 Register ICountryServiceClient with DI and configure HttpClient with Polly policies in Maliev.ContactService.Api/Program.cs
 - [X] T020 Bind CountryServiceOptions from configuration in Maliev.ContactService.Api/Program.cs
-- [X] T021 [P] Configure UsePathBase("/contacts") in Maliev.ContactService.Api/Program.cs to set base path for all routes
+- [X] T021 [P] Configure UsePathBase("/contact") in Maliev.ContactService.Api/Program.cs to set base path for all routes
 
 **Checkpoint**: Database schema updated, Country Service client ready for use
 
@@ -69,7 +69,7 @@ This is a .NET 9 microservice with 3-project structure:
 
 **Goal**: Enable customers to submit contact forms with required fields and validate countryId via Country Service
 
-**Independent Test**: Submit POST /contacts/v1 with fullName, email, countryId, subject, message, contactType. Verify inquiry is stored, Country Service validates countryId, duplicate prevention works within 60 seconds, rate limiting enforces 10 inquiries per hour per IP.
+**Independent Test**: Submit POST /contact/v1/contacts with fullName, email, countryId, subject, message, contactType. Verify inquiry is stored, Country Service validates countryId, duplicate prevention works within 60 seconds, rate limiting enforces 10 inquiries per hour per IP.
 
 **Status**: Partially implemented. Missing: Country Service validation, duplicate inquiry prevention, countryId in request model.
 
@@ -99,7 +99,7 @@ This is a .NET 9 microservice with 3-project structure:
 
 **Goal**: Enable business customers to include companyName in their inquiries
 
-**Independent Test**: Submit POST /contacts/v1 with companyName field populated. Verify it stores correctly and doesn't interfere with validation.
+**Independent Test**: Submit POST /contact/v1/contacts with companyName field populated. Verify it stores correctly and doesn't interfere with validation.
 
 **Status**: ✅ ALREADY IMPLEMENTED. No tasks required.
 
@@ -111,7 +111,7 @@ This is a .NET 9 microservice with 3-project structure:
 
 **Goal**: Enable customers to attach files to their contact inquiries
 
-**Independent Test**: Submit POST /contacts/v1 with files array. Verify files upload to Upload Service and inquiry stores file references.
+**Independent Test**: Submit POST /contact/v1/contacts with files array. Verify files upload to Upload Service and inquiry stores file references.
 
 **Status**: ✅ ALREADY IMPLEMENTED. Optional enhancement available (file size validation).
 
@@ -150,7 +150,7 @@ This is a .NET 9 microservice with 3-project structure:
 
 **Purpose**: Production readiness and documentation
 
-- [X] T046 [P] Update API documentation in README.md to reflect countryId requirement, Quotation type removal, and /contacts/v1 base path
+- [X] T046 [P] Update API documentation in README.md to reflect countryId requirement, Quotation type removal, and /contact/v1/contacts base path
 - [X] T047 [P] Update quickstart.md to include Country Service base URL configuration for local development in specs/001-contact-service/quickstart.md
 - [X] T048 [P] Add inline code comments for duplicate prevention logic in Maliev.ContactService.Api/Services/ContactService.cs
 - [X] T049 [P] Add inline code comments for Country Service circuit breaker behavior in Maliev.ContactService.Api/Services/CountryServiceClient.cs
@@ -158,7 +158,7 @@ This is a .NET 9 microservice with 3-project structure:
 - [X] T051 [P] Document migration execution steps for staging and production in specs/001-contact-service/data-model.md or deployment docs
 - [X] T052 Run dotnet build with TreatWarningsAsErrors=true to verify zero warnings per CLAUDE.md standards
 - [X] T053 Run dotnet test to verify all existing tests pass with new changes
-- [X] T054 Verify health checks at /contacts/liveness and /contacts/readiness still function correctly (✅ PASSING: T054_Liveness passes. T054_Readiness requires port-forward to test database)
+- [X] T054 Verify health checks at /contact/liveness and /contact/readiness still function correctly (✅ PASSING: T054_Liveness passes. T054_Readiness requires port-forward to test database)
 - [X] T055 Test rate limiting by submitting 11 inquiries within 1 hour (11th should return 429) (✅ PASSING: Test verified with PostgreSQL test database)
 - [X] T056 Test duplicate inquiry prevention by submitting twice within 60 seconds from same email (2nd should return 409) (✅ Tests created with PostgreSQL - ExceptionHandlingMiddleware fixed to unwrap AggregateException)
 - [X] T057 Test Country Service unavailability by stopping Country Service and submitting (should return 503) (✅ Tests created with FailingCountryServiceClient mock - ExceptionHandlingMiddleware fixed)
@@ -332,8 +332,8 @@ After completing Phase 3 (User Story 1):
 - [ ] Submit contact form with invalid countryId (999) → Returns HTTP 400 or 404 from Country Service validation (🔄 Can be automated)
 - [ ] Submit contact form with ContactType=Quotation (2) → Returns HTTP 422 (🔄 Can be automated)
 - [ ] Submit contact form with missing required fields → Returns HTTP 400 with field errors (🔄 Can be automated)
-- [X] Verify /contacts/liveness returns "Healthy" (✅ Automated: T054 integration test)
-- [X] Verify /contacts/readiness returns 200 OK (database connected) (✅ Automated: T054 integration test)
+- [X] Verify /contact/liveness returns "Healthy" (✅ Automated: T054 integration test)
+- [X] Verify /contact/readiness returns 200 OK (database connected) (✅ Automated: T054 integration test)
 
 **Load Testing** (optional, for success criteria validation):
 

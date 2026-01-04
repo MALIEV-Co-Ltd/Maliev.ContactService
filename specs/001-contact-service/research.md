@@ -100,7 +100,7 @@ Based on specification requirements (FR-023) and architectural patterns:
 - Limit: 10 submissions per IP per hour
 - Window: Fixed window (01:00:00)
 - Queue: 0 (reject immediately when limit exceeded)
-- Applies to: `POST /contacts/v1` endpoint
+- Applies to: `POST /contact/v1/contacts` endpoint
 
 **GlobalPolicy** (Admin Endpoints):
 - Limit: 100 requests per IP per hour (more permissive for internal use)

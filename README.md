@@ -91,14 +91,14 @@ The service will be available at `http://localhost:5000/contact`. Access the int
 
 ## 📡 API Endpoints
 
-All endpoints are prefixed with `/contact/v1/`.
+All endpoints are prefixed with `/contact/v1`.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/` | Submit a public contact form |
-| GET | `/` | List inquiries (Admin only) |
-| PUT | `/{id}/status` | Update inquiry status |
-| GET | `/{id}/files` | List files attached to an inquiry |
+| POST | `/contacts` | Submit a contact form |
+| GET | `/contacts` | List inquiries (Admin only) |
+| PUT | `/contacts/{id}/status` | Update inquiry status |
+| GET | `/contacts/{id}/files` | List files attached to an inquiry |
 
 ---
 

@@ -3,7 +3,7 @@
 **Feature**: Contact Submission Service
 **Branch**: `001-contact-service`
 **Date**: 2025-10-29
-**Base Path**: `/contacts/v1`
+**Base Path**: `/contact/v1/contacts`
 
 ## Overview
 
@@ -39,7 +39,7 @@ Authorization: Bearer <JWT_TOKEN>
 
 ## Endpoints
 
-### 1. GET /contacts/v1
+### 1. GET /contact/v1/contacts
 
 List all contact inquiries with filtering and pagination.
 
@@ -60,7 +60,7 @@ List all contact inquiries with filtering and pagination.
 
 **Request Example**:
 ```bash
-curl -X GET "https://api.maliev.com/contacts/v1?page=1&pageSize=20&status=0&contactType=0" \
+curl -X GET "https://api.maliev.com/contact/v1/contacts?page=1&pageSize=20&status=0&contactType=0" \
   -H "Authorization: Bearer <JWT_TOKEN>"
 ```
 
@@ -95,7 +95,7 @@ curl -X GET "https://api.maliev.com/contacts/v1?page=1&pageSize=20&status=0&cont
 
 ---
 
-### 2. GET /contacts/v1/{id}
+### 2. GET /contact/v1/contacts/{id}
 
 Retrieve detailed information for a specific inquiry including all attached files.
 
@@ -108,7 +108,7 @@ Retrieve detailed information for a specific inquiry including all attached file
 
 **Request Example**:
 ```bash
-curl -X GET "https://api.maliev.com/contacts/v1/12345" \
+curl -X GET "https://api.maliev.com/contact/v1/12345" \
   -H "Authorization: Bearer <JWT_TOKEN>"
 ```
 
@@ -155,7 +155,7 @@ curl -X GET "https://api.maliev.com/contacts/v1/12345" \
 
 ---
 
-### 3. PUT /contacts/v1/{id}/status
+### 3. PUT /contact/v1/contacts/{id}/status
 
 Update inquiry status and/or priority level.
 
@@ -181,7 +181,7 @@ Update inquiry status and/or priority level.
 
 **Request Example**:
 ```bash
-curl -X PUT "https://api.maliev.com/contacts/v1/12345/status" \
+curl -X PUT "https://api.maliev.com/contact/v1/12345/status" \
   -H "Authorization: Bearer <JWT_TOKEN>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -212,7 +212,7 @@ curl -X PUT "https://api.maliev.com/contacts/v1/12345/status" \
 
 ---
 
-### 4. DELETE /contacts/v1/{id}
+### 4. DELETE /contact/v1/contacts/{id}
 
 Permanently delete an inquiry and all associated files (including resolved inquiries).
 
@@ -236,7 +236,7 @@ Permanently delete an inquiry and all associated files (including resolved inqui
 
 **Request Example**:
 ```bash
-curl -X DELETE "https://api.maliev.com/contacts/v1/12345" \
+curl -X DELETE "https://api.maliev.com/contact/v1/12345" \
   -H "Authorization: Bearer <JWT_TOKEN>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -259,7 +259,7 @@ No response body.
 
 ---
 
-### 5. GET /contacts/v1/{id}/files
+### 5. GET /contact/v1/contacts/{id}/files
 
 Retrieve all files attached to a specific inquiry.
 
@@ -272,7 +272,7 @@ Retrieve all files attached to a specific inquiry.
 
 **Request Example**:
 ```bash
-curl -X GET "https://api.maliev.com/contacts/v1/12345/files" \
+curl -X GET "https://api.maliev.com/contact/v1/12345/files" \
   -H "Authorization: Bearer <JWT_TOKEN>"
 ```
 
@@ -306,7 +306,7 @@ curl -X GET "https://api.maliev.com/contacts/v1/12345/files" \
 
 ---
 
-### 6. GET /contacts/v1/{id}/files/{fileId}/download
+### 6. GET /contact/v1/contacts/{id}/files/{fileId}/download
 
 Download a specific file attached to an inquiry (proxies through Upload Service).
 
@@ -320,7 +320,7 @@ Download a specific file attached to an inquiry (proxies through Upload Service)
 
 **Request Example**:
 ```bash
-curl -X GET "https://api.maliev.com/contacts/v1/12345/files/456/download" \
+curl -X GET "https://api.maliev.com/contact/v1/12345/files/456/download" \
   -H "Authorization: Bearer <JWT_TOKEN>" \
   -o downloaded_file.pdf
 ```
@@ -348,7 +348,7 @@ Content-Length: 524288
 
 ---
 
-### 7. DELETE /contacts/v1/{id}/files/{fileId}
+### 7. DELETE /contact/v1/contacts/{id}/files/{fileId}
 
 Delete a specific file from an inquiry (removes from both database and Upload Service).
 
@@ -362,7 +362,7 @@ Delete a specific file from an inquiry (removes from both database and Upload Se
 
 **Request Example**:
 ```bash
-curl -X DELETE "https://api.maliev.com/contacts/v1/12345/files/456" \
+curl -X DELETE "https://api.maliev.com/contact/v1/12345/files/456" \
   -H "Authorization: Bearer <JWT_TOKEN>"
 ```
 
@@ -425,22 +425,22 @@ All list endpoints support pagination with the following format:
 
 ### Example 1: New Inquiries (Triage)
 ```bash
-GET /contacts/v1?status=0&page=1&pageSize=50
+GET /contact/v1/contacts?status=0&page=1&pageSize=50
 ```
 
 ### Example 2: Urgent Supplier Inquiries
 ```bash
-GET /contacts/v1?contactType=1&priority=3&status=0
+GET /contact/v1/contacts?contactType=1&priority=3&status=0
 ```
 
 ### Example 3: Customer Email History
 ```bash
-GET /contacts/v1?email=john@example.com
+GET /contact/v1/contacts?email=john@example.com
 ```
 
 ### Example 4: Recently Resolved
 ```bash
-GET /contacts/v1?status=2&page=1&pageSize=10
+GET /contact/v1/contacts?status=2&page=1&pageSize=10
 ```
 
 ---

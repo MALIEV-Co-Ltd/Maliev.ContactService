@@ -47,7 +47,7 @@ The service is already partially implemented but requires completion of Country 
   - Rate limiting: 10 inquiries per IP per hour (fixed window)
   - File size limit: 25MB per file, max 10 files per inquiry
   - Database migrations via dotnet ef CLI (not automatic on startup)
-  - Health checks: /contacts/liveness (startup), /contacts/readiness (database connectivity)
+  - Health checks: /contact/liveness (startup), /contact/readiness (database connectivity)
 
 **Scale/Scope**:
   - Expected volume: 100-500 inquiries/day initially

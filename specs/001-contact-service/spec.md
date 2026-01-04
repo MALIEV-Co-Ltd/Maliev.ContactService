@@ -195,7 +195,7 @@ Support staff and administrators need to track, prioritize, and manage customer 
 - **SC-004**: System handles at least 100 concurrent contact inquiries without degradation in response time
 - **SC-005**: Invalid inquiries provide error messages that include the field name and expected format (e.g., "Email: Must be a valid email address") in 100% of validation failures
 - **SC-006**: Zero contact inquiries are lost to database errors after acceptance (100% durability). File attachments may be lost to Upload Service failures per FR-018, but inquiry metadata is always persisted.
-- **SC-007**: 95% of customers successfully attach files inline to their inquiries on first attempt when needed. **Measurement**: Track ratio of successful POST /contacts/v1 requests with files array (HTTP 201) to total attempts with files array (all status codes). Exclude Upload Service failures per FR-018 (system allows partial file success).
+- **SC-007**: 95% of customers successfully attach files inline to their inquiries on first attempt when needed. **Measurement**: Track ratio of successful POST /contact/v1/contacts requests with files array (HTTP 201) to total attempts with files array (all status codes). Exclude Upload Service failures per FR-018 (system allows partial file success).
 
 #### Anti-Spam and Security Metrics
 
@@ -217,7 +217,7 @@ The following endpoints are available for administrative inquiry management, pro
 ### Inquiry Management
 
 #### List All Inquiries
-- **Endpoint**: `GET /contacts/v1`
+- **Endpoint**: `GET /contact/v1/contacts`
 - **Description**: Retrieve all contact inquiries with filtering and pagination
 - **Query Parameters**:
   - `page` (integer): Page number (default: 1)
@@ -228,14 +228,14 @@ The following endpoints are available for administrative inquiry management, pro
 - **Rate Limiting**: Uses `GlobalPolicy` rate limiter
 
 #### Get Specific Inquiry
-- **Endpoint**: `GET /contacts/v1/{id}`
+- **Endpoint**: `GET /contact/v1/contacts/{id}`
 - **Description**: Retrieve detailed information for a specific inquiry including all attached files
 - **Path Parameters**: `id` (integer): Contact submission ID
 - **Authentication**: Requires `Admin` role
 - **Rate Limiting**: Uses `GlobalPolicy` rate limiter
 
 #### Update Inquiry Status/Priority
-- **Endpoint**: `PUT /contacts/v1/{id}/status`
+- **Endpoint**: `PUT /contact/v1/contacts/{id}/status`
 - **Description**: Update inquiry status and/or priority level
 - **Path Parameters**: `id` (integer): Contact submission ID
 - **Request Body**:
@@ -246,7 +246,7 @@ The following endpoints are available for administrative inquiry management, pro
 - **Rate Limiting**: Uses `GlobalPolicy` rate limiter
 
 #### Delete Inquiry
-- **Endpoint**: `DELETE /contacts/v1/{id}`
+- **Endpoint**: `DELETE /contact/v1/contacts/{id}`
 - **Description**: Permanently delete an inquiry and all associated files (including resolved inquiries)
 - **Path Parameters**: `id` (integer): Contact submission ID
 - **Request Body**: `reason` (string, required): Deletion reason for audit trail
@@ -258,7 +258,7 @@ The following endpoints are available for administrative inquiry management, pro
 ### File Management
 
 #### List Inquiry Files
-- **Endpoint**: `GET /contacts/v1/{id}/files`
+- **Endpoint**: `GET /contact/v1/contacts/{id}/files`
 - **Description**: Retrieve all files attached to a specific inquiry
 - **Path Parameters**: `id` (integer): Contact submission ID
 - **Response**: Array of file metadata (fileName, contentType, fileSize, uploadServiceFileId, createdAt)
@@ -266,7 +266,7 @@ The following endpoints are available for administrative inquiry management, pro
 - **Rate Limiting**: Uses `GlobalPolicy` rate limiter
 
 #### Download File
-- **Endpoint**: `GET /contacts/v1/{id}/files/{fileId}/download`
+- **Endpoint**: `GET /contact/v1/contacts/{id}/files/{fileId}/download`
 - **Description**: Download a specific file attached to an inquiry (proxies through Upload Service)
 - **Path Parameters**:
   - `id` (integer): Contact submission ID
@@ -276,7 +276,7 @@ The following endpoints are available for administrative inquiry management, pro
 - **Rate Limiting**: Uses `GlobalPolicy` rate limiter
 
 #### Delete File
-- **Endpoint**: `DELETE /contacts/v1/{id}/files/{fileId}`
+- **Endpoint**: `DELETE /contact/v1/contacts/{id}/files/{fileId}`
 - **Description**: Delete a specific file from an inquiry (removes from both database and Upload Service)
 - **Path Parameters**:
   - `id` (integer): Contact submission ID
@@ -315,14 +315,14 @@ While the Contact Service has been implemented with core functionality, the foll
 
 **Current State**: ❌ Not configured
 - Routes currently use `/v1/contacts` pattern
-- Specification requires `/contacts/v1` pattern (service name first, then version)
+- Specification requires `/contact/v1/contacts` pattern (service name first, then version)
 - No base path middleware configured
 
 **Required Work**:
-- Add `app.UsePathBase("/contacts")` in `Program.cs` middleware pipeline
+- Add `app.UsePathBase("/contact")` in `Program.cs` middleware pipeline
 - Configure before routing middleware (before `UseRouting()` if explicit, or before `UseEndpoints()`/`MapControllers()`)
 - Update all controller routes to use `[Route("v1")]` or `[Route("v1/[controller]")]` patterns
-- Update health check routes to `/contacts/liveness` and `/contacts/readiness`
+- Update health check routes to `/contact/liveness` and `/contact/readiness`
 - Update Scalar route prefix to match base path
 
 **Implementation Example** (`Program.cs`):
@@ -330,7 +330,7 @@ While the Contact Service has been implemented with core functionality, the foll
 var app = builder.Build();
 
 // Configure base path BEFORE other middleware
-app.UsePathBase("/contacts");
+app.UsePathBase("/contact");
 
 // Middleware pipeline
 app.MapOpenApi(); // OpenAPI document generation
@@ -338,15 +338,15 @@ app.MapScalarApiReference(options =>
 {
     options.WithTitle("Contact Service API")
            .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient);
-}); // Scalar UI at /contacts/scalar
+}); // Scalar UI at /contact/scalar
 app.UseHttpsRedirection();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
 // Health checks with base path
-app.MapGet("/contacts/liveness", () => "Healthy").AllowAnonymous();
-app.MapHealthChecks("/contacts/readiness", new HealthCheckOptions
+app.MapGet("/contact/liveness", () => "Healthy").AllowAnonymous();
+app.MapHealthChecks("/contact/readiness", new HealthCheckOptions
 {
     Predicate = healthCheck => healthCheck.Tags.Contains("readiness"),
     ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
@@ -359,11 +359,11 @@ app.Run();
 **Controller Route Updates**:
 ```csharp
 // Current (incorrect):
-[Route("v1/contacts")]
+[Route("v1/contact")]
 public class ContactsController : ControllerBase
 
 // New (correct with UsePathBase):
-[Route("v1")]  // Or [Route("v1/contacts")] if you want explicit path
+[Route("v1")]  // Or [Route("v1/contact")] if you want explicit path
 public class ContactsController : ControllerBase
 ```
 
@@ -472,11 +472,11 @@ if (recentInquiry)
 #### 4. Email-Based Query Endpoint (FR-036)
 
 **Current State**: ❌ Not implemented
-- Generic list endpoint exists (`GET /contacts/v1`) but no email-specific query
+- Generic list endpoint exists (`GET /contact/v1/contacts`) but no email-specific query
 - Spec requires ability to query inquiries by email address
 
 **Required Work**:
-- Add endpoint method in `ContactsController`: `GET /contacts/v1?email={email}`
+- Add endpoint method in `ContactsController`: `GET /contact/v1/contacts?email={email}`
 - Implement filtering logic in `IContactService.GetContactMessagesAsync()` to filter by email
 - Consider authorization: should users be able to query their own submissions without Admin role?
 - Add pagination support for email query results
