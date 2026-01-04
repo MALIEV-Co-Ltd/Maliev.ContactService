@@ -27,19 +27,19 @@ public class FileDeletedEventConsumer : IConsumer<FileDeletedEvent>
     /// </summary>
     public async Task Consume(ConsumeContext<FileDeletedEvent> context)
     {
-        var message = context.Message;
-        
-        if (message.ServiceId != "contact-service")
+        var payload = context.Message.Payload;
+
+        if (payload.ServiceId != "contact-service")
         {
             // Possibly shared
         }
 
-        _logger.LogInformation("Processing FileDeletedEvent for FileId: {FileId}, StoragePath: {StoragePath}", 
-            message.FileId, message.StoragePath);
+        _logger.LogInformation("Processing FileDeletedEvent for FileId: {FileId}, StoragePath: {StoragePath}",
+            payload.FileId, payload.StoragePath);
 
         // Find contact files associated with this file
         var files = await _dbContext.ContactFiles
-            .Where(f => f.UploadServiceFileId == message.FileId || f.ObjectName == message.StoragePath)
+            .Where(f => f.UploadServiceFileId == payload.FileId || f.ObjectName == payload.StoragePath)
             .ToListAsync();
 
         if (files.Any())
