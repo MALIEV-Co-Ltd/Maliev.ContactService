@@ -1,5 +1,5 @@
-using Maliev.UploadService.Api.Events;
 using Maliev.ContactService.Data.DbContexts;
+using Maliev.MessagingContracts.Contracts;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
