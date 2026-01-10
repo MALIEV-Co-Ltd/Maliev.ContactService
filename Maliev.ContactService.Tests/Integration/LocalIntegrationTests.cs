@@ -479,7 +479,8 @@ public class LocalTestWebApplicationFactory : WebApplicationFactory<Program>, IA
             {
                 ["ConnectionStrings:ContactDbContext"] = _connectionString,
                 ["ConnectionStrings:rabbitmq"] = "amqp://guest:guest@localhost:5672",
-                ["Jwt:PublicKey"] = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(_rsaKey.ExportRSAPublicKeyPem()))
+                ["Jwt:PublicKey"] = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(_rsaKey.ExportRSAPublicKeyPem())),
+                ["Jwt:SecurityKey"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
             };
             config.AddInMemoryCollection(dict.Where(kv => kv.Value != null).ToDictionary(kv => kv.Key, kv => (string?)kv.Value));
         });

@@ -194,7 +194,7 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
                 ["UseTestcontainers"] = "true",
                 ["Service:Name"] = "ContactService",
                 ["Service:Version"] = "1.0.0-test",
-                ["Jwt:SecurityKey"] = "test-secret-key-at-least-32-characters-long"
+                ["Jwt:SecurityKey"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
             };
 
             foreach (var kv in GetAdditionalConfiguration())
