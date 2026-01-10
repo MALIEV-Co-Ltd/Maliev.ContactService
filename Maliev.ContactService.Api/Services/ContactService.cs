@@ -69,33 +69,6 @@ public class ContactService : IContactService
 
         _logger.LogInformation("Creating contact inquiry for {Email} with country ID {CountryId}", request.Email, request.CountryId);
 
-        var uploadedFiles = new List<ContactFile>();
-        if (request.Files.Any())
-        {
-            foreach (var fileRequest in request.Files)
-            {
-                try
-                {
-                    var objectName = $"contacts/{Guid.NewGuid()}/{fileRequest.FileName}";
-                    var uploadResponse = await _uploadService.UploadFileAsync(objectName, fileRequest.FileContent, fileRequest.ContentType ?? "application/octet-stream", fileRequest.FileName);
-                    var contactFile = new ContactFile
-                    {
-                        FileName = fileRequest.FileName,
-                        ObjectName = objectName,
-                        FileSize = uploadResponse.FileSize,
-                        ContentType = fileRequest.ContentType ?? "application/octet-stream",
-                        UploadServiceFileId = uploadResponse.FileId,
-                        CreatedAt = DateTimeOffset.UtcNow
-                    };
-                    uploadedFiles.Add(contactFile);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to upload file {FileName} for email {Email}", fileRequest.FileName, request.Email);
-                }
-            }
-        }
-
         var createdMessage = await strategy.ExecuteAsync(async () =>
         {
             using var transaction = await _context.Database.BeginTransactionAsync();
@@ -120,14 +93,39 @@ public class ContactService : IContactService
                 _context.ContactMessages.Add(contactMessage);
                 await _context.SaveChangesAsync();
 
-                if (uploadedFiles.Any())
+                if (request.Files.Any())
                 {
-                    foreach (var file in uploadedFiles)
+                    var uploadedFiles = new List<ContactFile>();
+                    foreach (var fileRequest in request.Files)
                     {
-                        file.ContactMessageId = contactMessage.Id;
+                        try
+                        {
+                            var objectName = $"contacts/{contactMessage.Id}/{Guid.NewGuid()}_{fileRequest.FileName}";
+                            var uploadResponse = await _uploadService.UploadFileAsync(objectName, fileRequest.FileContent, fileRequest.ContentType ?? "application/octet-stream", fileRequest.FileName);
+
+                            var contactFile = new ContactFile
+                            {
+                                ContactMessageId = contactMessage.Id,
+                                FileName = fileRequest.FileName,
+                                ObjectName = objectName,
+                                FileSize = uploadResponse.FileSize,
+                                ContentType = fileRequest.ContentType ?? "application/octet-stream",
+                                UploadServiceFileId = uploadResponse.FileId,
+                                CreatedAt = DateTimeOffset.UtcNow
+                            };
+                            uploadedFiles.Add(contactFile);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Failed to upload file {FileName} for contact {ContactId}, continuing submission.", fileRequest.FileName, contactMessage.Id);
+                        }
                     }
-                    _context.ContactFiles.AddRange(uploadedFiles);
-                    await _context.SaveChangesAsync();
+
+                    if (uploadedFiles.Any())
+                    {
+                        _context.ContactFiles.AddRange(uploadedFiles);
+                        await _context.SaveChangesAsync();
+                    }
                 }
 
                 await transaction.CommitAsync();
@@ -135,9 +133,10 @@ public class ContactService : IContactService
                 _logger.LogInformation("Contact inquiry created successfully. ID={ContactId}", contactMessage.Id);
                 return MapToDto(contactMessage);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 await transaction.RollbackAsync();
+                _logger.LogError(ex, "Failed to create contact inquiry for email {Email}. Transaction rolled back.", request.Email);
                 throw;
             }
         });
