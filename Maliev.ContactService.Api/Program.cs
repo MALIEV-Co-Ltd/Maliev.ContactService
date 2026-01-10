@@ -24,7 +24,7 @@ builder.AddStandardMiddleware(options =>
 {
     options.EnableRequestLogging = true;
 });
-builder.AddServiceMeters("contacts-meter", "Maliev.ContactService.Auth"); // Register service meters
+builder.AddServiceMeters("contacts-meter"); // Register service meters
 
 // Add Redis, MassTransit, and PostgreSQL DbContext
 builder.AddRedisDistributedCache(instanceName: "contact:"); // Redis with in-memory fallback
@@ -45,17 +45,10 @@ builder.AddJwtAuthentication();
 builder.Services.AddSingleton<IAuthMetrics, Maliev.ContactService.Api.Services.Auth.AuthMetricsService>();
 builder.Services.AddPermissionAuthorization();
 
-var auditLogEnabled = builder.Configuration.GetValue("AuditLog:Enabled", true);
-if (auditLogEnabled)
-{
-    builder.Services.AddSingleton(System.Threading.Channels.Channel.CreateUnbounded<AuditLog>());
-    builder.Services.AddHostedService<AuditLogBackgroundService>();
-    builder.Services.AddSingleton<IAuditLogService, AuditLogService>();
-}
-else
-{
-    builder.Services.AddSingleton<IAuditLogService, NoOpAuditLogService>();
-}
+// --- Audit Logging ---
+builder.Services.AddSingleton(System.Threading.Channels.Channel.CreateUnbounded<AuditLog>());
+builder.Services.AddHostedService<AuditLogBackgroundService>();
+builder.Services.AddSingleton<IAuditLogService, AuditLogService>();
 
 // Add OpenAPI (must be in Program.cs for XML comments to work via source generator)
 if (!builder.Environment.IsProduction())
@@ -103,11 +96,9 @@ builder.AddServiceClient<IUploadServiceClient, UploadServiceClient>("UploadServi
 // Configure CountryService HTTP client
 builder.AddServiceClient<ICountryServiceClient, CountryServiceClient>("CountryService");
 
-// Configure IAM Service Client
-builder.Services.AddIAMClient(builder.Configuration, "ContactService");
-
 // IAM Registration Service
-builder.Services.AddIAMRegistration<ContactIAMRegistrationService>();
+builder.AddIAMServiceClient("contact");
+builder.Services.AddIAMRegistration<ContactIAMRegistrationService>("contact");
 
 // Register application services
 builder.Services.AddScoped<IContactService, ContactService>();
@@ -129,7 +120,12 @@ using (var scope = app.Services.CreateScope())
 
 // Configure middleware pipeline
 app.UseForwardedHeaders();
-app.UseHttpsRedirection();
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
+
 app.UseStandardMiddleware();
 
 app.UseMiddleware<AuditLogMiddleware>();

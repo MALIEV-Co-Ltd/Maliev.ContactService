@@ -71,7 +71,7 @@ public class ContactService : IContactService
 
         var createdMessage = await strategy.ExecuteAsync(async () =>
         {
-            using var transaction = _context.Database.ProviderName != "Microsoft.EntityFrameworkCore.InMemory" ? await _context.Database.BeginTransactionAsync() : null;
+            using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
                 var contactMessage = new ContactMessage
@@ -95,12 +95,14 @@ public class ContactService : IContactService
 
                 if (request.Files.Any())
                 {
+                    var uploadedFiles = new List<ContactFile>();
                     foreach (var fileRequest in request.Files)
                     {
                         try
                         {
-                            var objectName = $"contacts/{contactMessage.Id}/{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}_{fileRequest.FileName}";
+                            var objectName = $"contacts/{contactMessage.Id}/{Guid.NewGuid()}_{fileRequest.FileName}";
                             var uploadResponse = await _uploadService.UploadFileAsync(objectName, fileRequest.FileContent, fileRequest.ContentType ?? "application/octet-stream", fileRequest.FileName);
+
                             var contactFile = new ContactFile
                             {
                                 ContactMessageId = contactMessage.Id,
@@ -111,24 +113,30 @@ public class ContactService : IContactService
                                 UploadServiceFileId = uploadResponse.FileId,
                                 CreatedAt = DateTimeOffset.UtcNow
                             };
-                            _context.ContactFiles.Add(contactFile);
+                            uploadedFiles.Add(contactFile);
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError(ex, "Failed to upload file {FileName} for contact {ContactId}", fileRequest.FileName, contactMessage.Id);
+                            _logger.LogError(ex, "Failed to upload file {FileName} for contact {ContactId}, continuing submission.", fileRequest.FileName, contactMessage.Id);
                         }
                     }
-                    await _context.SaveChangesAsync();
+
+                    if (uploadedFiles.Any())
+                    {
+                        _context.ContactFiles.AddRange(uploadedFiles);
+                        await _context.SaveChangesAsync();
+                    }
                 }
 
-                if (transaction != null) await transaction.CommitAsync();
+                await transaction.CommitAsync();
 
                 _logger.LogInformation("Contact inquiry created successfully. ID={ContactId}", contactMessage.Id);
                 return MapToDto(contactMessage);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                if (transaction != null) await transaction.RollbackAsync();
+                await transaction.RollbackAsync();
+                _logger.LogError(ex, "Failed to create contact inquiry for email {Email}. Transaction rolled back.", request.Email);
                 throw;
             }
         });

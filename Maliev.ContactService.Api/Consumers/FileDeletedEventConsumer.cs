@@ -31,7 +31,8 @@ public class FileDeletedEventConsumer : IConsumer<FileDeletedEvent>
 
         if (payload.ServiceId != "contact-service")
         {
-            // Possibly shared
+            _logger.LogDebug("Ignoring FileDeletedEvent for external service: {ServiceId}", payload.ServiceId);
+            return;
         }
 
         _logger.LogInformation("Processing FileDeletedEvent for FileId: {FileId}, StoragePath: {StoragePath}",

@@ -43,12 +43,12 @@ public static class DataSeeder
             await dbContext.SaveChangesAsync();
 
             // 2. Seed Roles
-            var allRoles = ContactPredefinedRoles.GetAll().ToList();
             var existingRoles = await dbContext.Roles.Include(r => r.RolePermissions).ThenInclude(rp => rp.Permission).ToListAsync();
             var permissions = await dbContext.Permissions.ToListAsync();
 
-            foreach (var roleName in allRoles)
+            foreach (var roleDef in ContactPredefinedRoles.All)
             {
+                var roleName = roleDef.RoleId;
                 var role = existingRoles.FirstOrDefault(r => r.Name == roleName);
                 if (role == null)
                 {
@@ -56,14 +56,14 @@ public static class DataSeeder
                     {
                         Id = Guid.NewGuid(),
                         Name = roleName,
-                        Description = $"Predefined {roleName} role"
+                        Description = roleDef.Description
                     };
                     dbContext.Roles.Add(role);
-                    await dbContext.SaveChangesAsync(); // Save immediately to prevent duplicates if another thread bypasses semaphore (unlikely but safer)
+                    await dbContext.SaveChangesAsync();
                 }
 
                 // Sync permissions for the role
-                var rolePermissionNames = ContactPredefinedRoles.GetPermissionsForRole(roleName).ToList();
+                var rolePermissionNames = roleDef.Permissions;
 
                 // Remove permissions no longer in the role definition
                 var toRemove = role.RolePermissions

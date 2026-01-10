@@ -177,7 +177,6 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.UseSetting("AuditLog:Enabled", "false");
 
         // Inject test-specific configuration scoped to the test host
         builder.ConfigureAppConfiguration((context, configBuilder) =>
@@ -194,7 +193,8 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
                 ["Jwt:Audience"] = "test-audience",
                 ["UseTestcontainers"] = "true",
                 ["Service:Name"] = "ContactService",
-                ["Service:Version"] = "1.0.0-test"
+                ["Service:Version"] = "1.0.0-test",
+                ["Jwt:SecurityKey"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
             };
 
             foreach (var kv in GetAdditionalConfiguration())

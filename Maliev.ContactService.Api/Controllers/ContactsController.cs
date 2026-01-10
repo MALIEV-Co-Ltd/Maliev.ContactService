@@ -75,17 +75,6 @@ public class ContactsController : ControllerBase
     {
         try
         {
-            // T044: Validate pagination parameters
-            if (pagination.PageSize < 1 || pagination.PageSize > 100)
-            {
-                return BadRequest(new { message = "PageSize must be between 1 and 100" });
-            }
-
-            if (pagination.Page < 1)
-            {
-                return BadRequest(new { message = "Page must be greater than or equal to 1" });
-            }
-
             var contacts = await _contactService.GetContactMessagesAsync(pagination.Page, pagination.PageSize, status, contactType, email);
             return Ok(contacts);
         }

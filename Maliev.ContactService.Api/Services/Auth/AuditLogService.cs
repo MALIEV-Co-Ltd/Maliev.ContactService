@@ -45,15 +45,3 @@ public class AuditLogService : IAuditLogService
         }
     }
 }
-
-/// <summary>
-/// No-op implementation of the audit log service.
-/// </summary>
-public class NoOpAuditLogService : IAuditLogService
-{
-    /// <inheritdoc/>
-    public void LogDecision(string userId, string action, string resource, bool result, string? reason, string? clientIp)
-    {
-        // Do nothing
-    }
-}

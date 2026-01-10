@@ -50,12 +50,7 @@ public class AuditLogMiddleware
             _logger.LogWarning("Security event detected in middleware: {StatusCode} for {UserId} at {Path}",
                 context.Response.StatusCode, userId, context.Request.Path);
 
-            // We don't necessarily want to spam the DB for every 401 (e.g. bots), 
-            // but for 403 it's important.
-            if (context.Response.StatusCode == StatusCodes.Status403Forbidden)
-            {
-                auditLog.LogDecision(userId, action, resource, result, reason, clientIp);
-            }
+            auditLog.LogDecision(userId, action, resource, result, reason, clientIp);
         }
     }
 }

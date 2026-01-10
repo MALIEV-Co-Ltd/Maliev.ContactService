@@ -81,8 +81,8 @@ This is a .NET 9 microservice with 3-project structure:
 - [X] T025 [US1] Add duplicate inquiry check to ContactService.CreateContactMessageAsync before creating record (query Email + CreatedAt > 60 seconds ago) in Maliev.ContactService.Api/Services/ContactService.cs
 - [X] T026 [US1] Add Country Service validation to ContactService.CreateContactMessageAsync (call ValidateCountryExistsAsync, throw 503 after Polly retries exhausted per T016-T017) in Maliev.ContactService.Api/Services/ContactService.cs
 - [X] T027 [US1] Update ContactService.CreateContactMessageAsync to map CountryId from request to entity in Maliev.ContactService.Api/Services/ContactService.cs
-- [X] T028 [US1] Add exception handling middleware to map CountryServiceException to 503 response with spec message in Maliev.ContactService.Api/Middleware or Program.cs
-- [X] T029 [US1] Add exception handling middleware to map DuplicateInquiryException to 409 Conflict response in Maliev.ContactService.Api/Middleware or Program.cs
+- [X] T028 [US1] Add exception handling middleware to map CountryServiceException to 503 response with spec message in Maliev.ContactService.Api/Middleware/ExceptionHandlingMiddleware.cs
+- [X] T029 [US1] Add exception handling middleware to map DuplicateInquiryException to 409 Conflict response in Maliev.ContactService.Api/Middleware/ExceptionHandlingMiddleware.cs
 - [X] T030 [US1] Update Program.cs to read RateLimiting configuration values from appsettings.json instead of hardcoded values in Maliev.ContactService.Api/Program.cs
 - [X] T031 [US1] Update ContactMessageResponse DTO to include CountryId in response in Maliev.ContactService.Api/Models/ContactMessageResponse.cs
 - [X] T032 [P] [US1] Add message length validation (max 10,000 chars) to CreateContactMessageRequest in Maliev.ContactService.Api/Models/CreateContactMessageRequest.cs

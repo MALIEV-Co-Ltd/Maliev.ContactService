@@ -79,11 +79,11 @@ public class CreateContactMessageRequest : IValidatableObject
     /// <returns>A collection of validation results.</returns>
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-        // FR-013: Reject Quotation contact type
-        if (ContactType == (ContactType)2) // Quotation enum value (removed from enum but still possible in requests)
+        // FR-013: Reject invalid or excluded contact types
+        if (!Enum.IsDefined(typeof(ContactType), ContactType))
         {
             yield return new ValidationResult(
-                "Quotation inquiries are not accepted through this service. Please use the Quotation Service.",
+                "The selected contact type is invalid or not accepted through this service.",
                 new[] { nameof(ContactType) });
         }
 

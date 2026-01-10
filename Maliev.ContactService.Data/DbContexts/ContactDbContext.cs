@@ -78,20 +78,12 @@ public class ContactDbContext : DbContext
             var auditableEntity = (IAuditable)entity.Entity;
             var now = DateTimeOffset.UtcNow;
 
-            if (entity.State == EntityState.Added)
+            if (entity.State == EntityState.Added && auditableEntity.CreatedAt == DateTimeOffset.MinValue)
             {
-                // Only set CreatedAt if it hasn't been explicitly set (is default DateTimeOffset)
-                if (auditableEntity.CreatedAt == DateTimeOffset.MinValue)
-                {
-                    auditableEntity.CreatedAt = now;
-                }
+                auditableEntity.CreatedAt = now;
             }
 
-            // Only set UpdatedAt if it hasn't been explicitly set (is default DateTimeOffset)
-            if (auditableEntity.UpdatedAt == DateTimeOffset.MinValue)
-            {
-                auditableEntity.UpdatedAt = now;
-            }
+            auditableEntity.UpdatedAt = now;
         }
     }
 
@@ -152,9 +144,6 @@ public class ContactDbContext : DbContext
             entity.Property(e => e.UpdatedAt)
                 .IsRequired()
                 .HasDefaultValueSql("NOW()");
-
-            // Ignore the RowVersion property (PostgreSQL doesn't need it for concurrency)
-            entity.Ignore(e => e.RowVersion);
 
             // Indexes for performance
             entity.HasIndex(e => e.Email);
