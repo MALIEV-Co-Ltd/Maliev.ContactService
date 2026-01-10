@@ -48,7 +48,6 @@ public class RateLimitingTestWebApplicationFactory : BaseIntegrationTestFactory<
         base.ConfigureWebHost(builder);
 
         // Configure rate limiting settings
-        builder.UseSetting("AuditLog:Enabled", "false");
         builder.ConfigureAppConfiguration((context, config) =>
         {
             var dict = new Dictionary<string, string?>

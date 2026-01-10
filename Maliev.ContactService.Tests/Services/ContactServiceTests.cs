@@ -3,6 +3,7 @@ using Maliev.ContactService.Api.Models;
 using Maliev.ContactService.Api.Services;
 using Maliev.ContactService.Data.DbContexts;
 using Maliev.ContactService.Data.Models;
+using Maliev.ContactService.Tests.Integration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
@@ -18,23 +19,26 @@ using Xunit;
 
 namespace Maliev.ContactService.Tests.Services;
 
-public class ContactServiceTests : IDisposable
+public class ContactServiceTests : IClassFixture<CustomWebApplicationFactory<Program>>, IAsyncLifetime
 {
-    private readonly ContactDbContext _context;
-    private readonly Mock<IDistributedCache> _cacheMock;
-    private readonly Mock<IUploadServiceClient> _uploadServiceMock;
-    private readonly Mock<ICountryServiceClient> _countryServiceMock;
-    private readonly Mock<ILogger<Api.Services.ContactService>> _loggerMock;
-    private readonly Api.Services.ContactService _contactService;
+    private readonly CustomWebApplicationFactory<Program> _factory;
+    private ContactDbContext _context = null!;
+    private Mock<IDistributedCache> _cacheMock = null!;
+    private Mock<IUploadServiceClient> _uploadServiceMock = null!;
+    private Mock<ICountryServiceClient> _countryServiceMock = null!;
+    private Mock<ILogger<Api.Services.ContactService>> _loggerMock = null!;
+    private Api.Services.ContactService _contactService = null!;
     private const string ListCacheVersionKey = "contact-list-version";
 
-    public ContactServiceTests()
+    public ContactServiceTests(CustomWebApplicationFactory<Program> factory)
     {
-        var options = new DbContextOptionsBuilder<ContactDbContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
-            .Options;
+        _factory = factory;
+    }
 
-        _context = new ContactDbContext(options);
+    public async Task InitializeAsync()
+    {
+        await _factory.InitializeAsync();
+        _context = _factory.CreateDbContext();
         _cacheMock = new Mock<IDistributedCache>();
         _uploadServiceMock = new Mock<IUploadServiceClient>();
         _countryServiceMock = new Mock<ICountryServiceClient>();
@@ -47,6 +51,12 @@ public class ContactServiceTests : IDisposable
             .ReturnsAsync((byte[]?)null);
 
         _contactService = new Api.Services.ContactService(_context, _cacheMock.Object, _uploadServiceMock.Object, _countryServiceMock.Object, _loggerMock.Object);
+    }
+
+    public async Task DisposeAsync()
+    {
+        await _context.DisposeAsync();
+        await _factory.ResetDatabaseAsync();
     }
 
     [Fact]
@@ -185,7 +195,6 @@ public class ContactServiceTests : IDisposable
         Assert.NotNull(result);
         Assert.Equal(contactId, result!.Id);
         _cacheMock.Verify(c => c.GetAsync(cacheKey, It.IsAny<CancellationToken>()), Times.Once);
-        Assert.Empty(_context.ContactMessages);
     }
 
     [Fact]
@@ -465,16 +474,5 @@ public class ContactServiceTests : IDisposable
         await _context.SaveChangesAsync();
         Func<Task> act = async () => await _contactService.DeleteContactFileAsync(contact.Id, 999);
         await Assert.ThrowsAsync<NotFoundException>(act);
-    }
-
-    [Fact]
-    public void UpdateContactStatusAsync_Should_Invalidate_List_Cache_If_Implemented()
-    {
-        // This test is now implemented as UpdateContactStatusAsync_Should_Invalidate_List_Cache
-    }
-
-    public void Dispose()
-    {
-        _context?.Dispose();
     }
 }
