@@ -55,15 +55,28 @@ public static class ContactPermissions
     }
 
     /// <summary>
+    /// Collection of all defined contact permissions with descriptions.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, string> AllWithDescriptions = new Dictionary<string, string>
+    {
+        { Contacts.Create, "Create contacts" },
+        { Contacts.Read, "Read contacts" },
+        { Contacts.Update, "Update contacts" },
+        { Contacts.Delete, "Delete contacts" },
+        { Contacts.Merge, "Merge contacts" },
+        { Contacts.Export, "Export contacts" },
+        { Communications.Log, "Log communications" },
+        { Communications.Read, "Read communications" },
+        { Communications.Delete, "Delete communications" },
+        { Groups.Create, "Create groups" },
+        { Groups.Read, "Read groups" },
+        { Groups.Update, "Update groups" },
+        { Groups.Delete, "Delete groups" },
+        { Groups.Assign, "Assign groups" }
+    };
+
+    /// <summary>
     /// Gets all registered permissions.
     /// </summary>
-    public static IEnumerable<string> GetAll()
-    {
-        return new[]
-        {
-            Contacts.Create, Contacts.Read, Contacts.Update, Contacts.Delete, Contacts.Merge, Contacts.Export,
-            Communications.Log, Communications.Read, Communications.Delete,
-            Groups.Create, Groups.Read, Groups.Update, Groups.Delete, Groups.Assign
-        };
-    }
+    public static IEnumerable<string> GetAll() => AllWithDescriptions.Keys;
 }
