@@ -50,37 +50,43 @@ public class ExceptionHandlingMiddleware
         var response = context.Response;
         response.ContentType = "application/problem+json";
 
-        var (statusCode, title, detail) = exception switch
+        var (statusCode, title, detail, type) = exception switch
         {
             DuplicateInquiryException => (
                 (int)HttpStatusCode.Conflict,
                 "Conflict",
-                exception.Message
+                exception.Message,
+                "https://tools.ietf.org/html/rfc7231#section-6.5.8"
             ),
             CountryServiceException => (
                 (int)HttpStatusCode.ServiceUnavailable,
                 "Service Unavailable",
-                exception.Message
+                exception.Message,
+                "https://tools.ietf.org/html/rfc7231#section-6.6.4"
             ),
             NotFoundException => (
                 (int)HttpStatusCode.NotFound,
                 "Not Found",
-                exception.Message
+                exception.Message,
+                "https://tools.ietf.org/html/rfc7231#section-6.5.4"
             ),
             ArgumentException => (
                 (int)HttpStatusCode.BadRequest,
                 "Bad Request",
-                exception.Message
+                exception.Message,
+                "https://tools.ietf.org/html/rfc7231#section-6.5.1"
             ),
             InvalidOperationException => (
                 (int)HttpStatusCode.Conflict,
                 "Conflict",
-                exception.Message
+                exception.Message,
+                "https://tools.ietf.org/html/rfc7231#section-6.5.8"
             ),
             _ => (
                 (int)HttpStatusCode.InternalServerError,
                 "Internal Server Error",
-                "An unexpected error occurred while processing your request."
+                "An unexpected error occurred while processing your request.",
+                "https://tools.ietf.org/html/rfc7231#section-6.6.1"
             )
         };
 
@@ -97,7 +103,7 @@ public class ExceptionHandlingMiddleware
 
         var result = JsonSerializer.Serialize(new
         {
-            type = $"https://tools.ietf.org/html/rfc7231#section-6.6.1", // Generic for now
+            type = type,
             title = title,
             status = statusCode,
             detail = detail,
