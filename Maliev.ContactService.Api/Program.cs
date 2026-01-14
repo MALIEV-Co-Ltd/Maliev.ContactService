@@ -1,3 +1,4 @@
+#pragma warning disable CA1848 // For improved performance, use the LoggerMessage delegates
 using Maliev.ContactService.Api.Middleware;
 using Maliev.ContactService.Api.Models;
 using Maliev.ContactService.Api.Services;
