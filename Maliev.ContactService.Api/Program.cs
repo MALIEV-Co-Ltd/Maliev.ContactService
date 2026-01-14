@@ -1,4 +1,3 @@
-#pragma warning disable CA1848 // For improved performance, use the LoggerMessage delegates
 using Maliev.ContactService.Api.Middleware;
 using Maliev.ContactService.Api.Models;
 using Maliev.ContactService.Api.Services;
@@ -20,7 +19,7 @@ var bootstrapLogger = loggerFactory.CreateLogger("Program");
 
 try
 {
-    bootstrapLogger.LogInformation("Starting Contact Service host");
+    Maliev.ContactService.Api.Program.Log.StartingHost(bootstrapLogger, "Contact Service");
 
     var builder = WebApplication.CreateBuilder(args);
 
@@ -154,12 +153,12 @@ try
     // Map OpenAPI and Scalar documentation (dev/staging only)
     app.MapApiDocumentation(servicePrefix: "contact");
 
-    logger.LogInformation("ContactService started successfully");
+    Maliev.ContactService.Api.Program.Log.ServiceStarted(logger, "Contact Service");
     await app.RunAsync();
 }
 catch (Exception ex)
 {
-    bootstrapLogger.LogCritical(ex, "Contact Service host terminated unexpectedly during startup");
+    Maliev.ContactService.Api.Program.Log.HostTerminated(bootstrapLogger, ex, "Contact Service");
     throw;
 }
 finally
@@ -172,5 +171,18 @@ namespace Maliev.ContactService.Api
     /// <summary>
     /// Main program class for the application
     /// </summary>
-    public partial class Program { }
+    public partial class Program
+    {
+        internal static partial class Log
+        {
+            [LoggerMessage(Level = LogLevel.Information, Message = "Starting {ServiceName} host")]
+            public static partial void StartingHost(ILogger logger, string serviceName);
+
+            [LoggerMessage(Level = LogLevel.Critical, Message = "{ServiceName} host terminated unexpectedly during startup")]
+            public static partial void HostTerminated(ILogger logger, Exception ex, string serviceName);
+
+            [LoggerMessage(Level = LogLevel.Information, Message = "{ServiceName} started successfully")]
+            public static partial void ServiceStarted(ILogger logger, string serviceName);
+        }
+    }
 }
