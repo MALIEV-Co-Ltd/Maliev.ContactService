@@ -1,6 +1,5 @@
 using Maliev.ContactService.Api.Exceptions;
 using Maliev.ContactService.Api.Models;
-using Microsoft.Extensions.Options;
 using System.Net;
 
 namespace Maliev.ContactService.Api.Services;

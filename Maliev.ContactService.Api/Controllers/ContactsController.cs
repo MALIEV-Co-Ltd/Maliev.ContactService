@@ -1,8 +1,8 @@
 using Asp.Versioning;
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.ContactService.Api.Models;
 using Maliev.ContactService.Api.Services;
 using Maliev.ContactService.Api.Services.Auth;
-using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.ContactService.Data.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

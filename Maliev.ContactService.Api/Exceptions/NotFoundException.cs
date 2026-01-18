@@ -1,5 +1,3 @@
-using System;
-
 namespace Maliev.ContactService.Api.Exceptions;
 
 /// <summary>

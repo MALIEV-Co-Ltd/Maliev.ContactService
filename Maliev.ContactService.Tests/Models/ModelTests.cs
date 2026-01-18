@@ -1,5 +1,8 @@
+using System.ComponentModel.DataAnnotations;
 using Maliev.ContactService.Api.Models;
+using Maliev.ContactService.Api.Services;
 using Maliev.ContactService.Data.Models;
+using Xunit;
 
 namespace Maliev.ContactService.Tests.Models;
 
@@ -118,5 +121,123 @@ public class ModelTests
     {
         // Assert
         Assert.True(Enum.IsDefined(typeof(ContactStatus), status));
+    }
+
+    [Fact]
+    public void CreateContactMessageRequest_Validate_InvalidContactType_ReturnsError()
+    {
+        // Arrange
+        var request = new CreateContactMessageRequest
+        {
+            FullName = "Test",
+            Email = "test@test.com",
+            Subject = "Test",
+            Message = "Test",
+            ContactType = (ContactType)999
+        };
+        var context = new ValidationContext(request);
+
+        // Act
+        var results = request.Validate(context);
+
+        // Assert
+        Assert.Contains(results, r => r.MemberNames.Contains(nameof(CreateContactMessageRequest.ContactType)));
+    }
+
+    [Fact]
+    public void CreateContactMessageRequest_Validate_TooManyFiles_ReturnsError()
+    {
+        // Arrange
+        var request = new CreateContactMessageRequest
+        {
+            FullName = "Test",
+            Email = "test@test.com",
+            Subject = "Test",
+            Message = "Test",
+            Files = Enumerable.Range(0, 11).Select(i => new CreateContactFileRequest { FileName = "test.txt", FileContent = new byte[10] }).ToList()
+        };
+        var context = new ValidationContext(request);
+
+        // Act
+        var results = request.Validate(context);
+
+        // Assert
+        Assert.Contains(results, r => r.MemberNames.Contains(nameof(CreateContactMessageRequest.Files)));
+    }
+
+    [Fact]
+    public void CreateContactMessageRequest_Validate_FileTooLarge_ReturnsError()
+    {
+        // Arrange
+        var request = new CreateContactMessageRequest
+        {
+            FullName = "Test",
+            Email = "test@test.com",
+            Subject = "Test",
+            Message = "Test",
+            Files = new List<CreateContactFileRequest>
+            {
+                new CreateContactFileRequest
+                {
+                    FileName = "large.txt",
+                    FileContent = new byte[26 * 1024 * 1024] // 26MB
+                }
+            }
+        };
+        var context = new ValidationContext(request);
+
+        // Act
+        var results = request.Validate(context);
+
+        // Assert
+        Assert.Contains(results, r => r.MemberNames.Contains("Files[0]"));
+    }
+
+    [Fact]
+    public void CacheOptions_Properties_Work()
+    {
+        var options = new CacheOptions { MaxCacheSize = 2000, DefaultExpirationMinutes = 10 };
+        Assert.Equal(2000, options.MaxCacheSize);
+        Assert.Equal(10, options.DefaultExpirationMinutes);
+    }
+
+    [Fact]
+    public void CountryDto_Properties_Work()
+    {
+        var dto = new CountryDto { Id = 1, Name = "Test", Iso2 = "TS", IsActive = true };
+        Assert.Equal(1, dto.Id);
+        Assert.Equal("Test", dto.Name);
+        Assert.Equal("TS", dto.Iso2);
+        Assert.True(dto.IsActive);
+    }
+
+    [Fact]
+    public void UploadRequest_Properties_Work()
+    {
+        var request = new UploadRequest
+        {
+            ObjectName = "obj",
+            ContentType = "text/plain",
+            FileName = "test.txt",
+            FileContent = new byte[] { 1, 2, 3 }
+        };
+        Assert.Equal("obj", request.ObjectName);
+        Assert.Equal("text/plain", request.ContentType);
+        Assert.Equal("test.txt", request.FileName);
+        Assert.Equal(3, request.FileContent.Length);
+    }
+
+    [Fact]
+    public void CreateContactMessageRequest_Files_Can_Be_Null()
+    {
+        var request = new CreateContactMessageRequest
+        {
+            FullName = "T",
+            Email = "e",
+            Subject = "s",
+            Message = "m",
+            Files = null!
+        };
+        Assert.Null(request.Files);
     }
 }

@@ -1,7 +1,6 @@
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
-using Microsoft.Extensions.Configuration;
-using Maliev.Aspire.ServiceDefaults.Authorization;
 
 namespace Maliev.ContactService.Api.Services.Auth;
 
