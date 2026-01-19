@@ -235,7 +235,48 @@ public class ContactServiceTests : IClassFixture<CustomWebApplicationFactory<Pro
     }
 
     [Fact]
+    public async Task UpdateContactStatusAsync_Should_Log_Warning_When_Potentially_Concurrent()
+    {
+        // Arrange
+        var contact = new ContactMessage
+        {
+            FullName = "Concurrent Test",
+            Email = "concurrent@example.com",
+            Subject = "Subject",
+            Message = "Message",
+            CountryId = 1,
+            ContactType = ContactType.General,
+            Priority = Priority.Medium,
+            Status = ContactStatus.New,
+            CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-10),
+            UpdatedAt = DateTimeOffset.UtcNow.AddMinutes(-2) // Within 5 minutes
+        };
+
+        _context.ContactMessages.Add(contact);
+        await _context.SaveChangesAsync();
+
+        var updateRequest = new UpdateContactStatusRequest
+        {
+            Status = ContactStatus.InProgress
+        };
+
+        // Act
+        await _contactService.UpdateContactStatusAsync(contact.Id, updateRequest);
+
+        // Assert
+        _loggerMock.Verify(
+            x => x.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Potential concurrent update")),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task UpdateContactStatusAsync_Should_Set_ResolvedAt_When_Resolved()
+
     {
         // Arrange
         var contact = new ContactMessage
@@ -327,7 +368,282 @@ public class ContactServiceTests : IClassFixture<CustomWebApplicationFactory<Pro
     }
 
     [Fact]
+    public async Task GetContactMessagesAsync_Should_Filter_By_ContactType()
+    {
+        // Arrange
+        _context.ContactMessages.AddRange(new[]
+        {
+            new ContactMessage { FullName = "User 1", Email = "user1@example.com", Subject = "Subject 1", Message = "Message 1", CountryId = 1, ContactType = ContactType.General, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow },
+            new ContactMessage { FullName = "User 2", Email = "user2@example.com", Subject = "Subject 2", Message = "Message 2", CountryId = 1, ContactType = ContactType.Business, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow }
+        });
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _contactService.GetContactMessagesAsync(contactType: ContactType.Business);
+
+        // Assert
+        Assert.Single(result);
+        Assert.Equal("User 2", result.First().FullName);
+    }
+
+    [Fact]
+    public async Task GetContactMessagesAsync_Should_Filter_By_Email()
+    {
+        // Arrange
+        _context.ContactMessages.AddRange(new[]
+        {
+            new ContactMessage { FullName = "User 1", Email = "user1@example.com", Subject = "Subject 1", Message = "Message 1", CountryId = 1, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow },
+            new ContactMessage { FullName = "User 2", Email = "user2@example.com", Subject = "Subject 2", Message = "Message 2", CountryId = 1, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow }
+        });
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _contactService.GetContactMessagesAsync(email: "USER1@EXAMPLE.COM");
+
+        // Assert
+        Assert.Single(result);
+        Assert.Equal("User 1", result.First().FullName);
+    }
+
+    [Fact]
+    public async Task GetContactMessagesAsync_Should_Return_Empty_On_Cache_Miss_And_Empty_Db()
+    {
+        // Act
+        var result = await _contactService.GetContactMessagesAsync();
+
+        // Assert
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task GetContactMessagesAsync_Should_Handle_Empty_Cached_Bytes()
+    {
+        // Arrange
+        _cacheMock.Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<byte>());
+
+        // Act
+        var result = await _contactService.GetContactMessagesAsync();
+
+        // Assert
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task GetContactMessagesAsync_Should_Return_Cached_Results()
+    {
+        // Arrange
+        var dtos = new List<ContactMessageDto>
+        {
+            new ContactMessageDto { Id = 1, FullName = "Cached", Email = "c@e.com", Subject = "S", Message = "M", CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow }
+        };
+        var serialized = JsonSerializer.Serialize((IEnumerable<ContactMessageDto>)dtos);
+        var bytes = Encoding.UTF8.GetBytes(serialized);
+
+        _cacheMock.Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(bytes);
+
+        // Act
+        var result = await _contactService.GetContactMessagesAsync();
+
+        // Assert
+        Assert.Single(result);
+        Assert.Equal("Cached", result.First().FullName);
+    }
+
+    [Fact]
+    public async Task GetContactFileByIdAsync_Should_Return_File_When_Exists()
+    {
+        // Arrange
+        var contact = new ContactMessage { FullName = "Test", Email = "test@example.com", Subject = "Test", Message = "Test", CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow };
+        _context.ContactMessages.Add(contact);
+        await _context.SaveChangesAsync();
+
+        var file = new ContactFile
+        {
+            ContactMessageId = contact.Id,
+            FileName = "test.txt",
+            ObjectName = "obj",
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+        _context.ContactFiles.Add(file);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _contactService.GetContactFileByIdAsync(contact.Id, file.Id);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(file.Id, result!.Id);
+    }
+
+    [Fact]
+    public async Task DeleteContactFileAsync_Should_Not_Call_UploadService_When_No_FileId()
+    {
+        // Arrange
+        var contact = new ContactMessage { FullName = "Test", Email = "test@example.com", Subject = "Test", Message = "Test", CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow };
+        _context.ContactMessages.Add(contact);
+        await _context.SaveChangesAsync();
+
+        var file = new ContactFile
+        {
+            ContactMessageId = contact.Id,
+            FileName = "test.txt",
+            ObjectName = "obj",
+            UploadServiceFileId = null, // No file ID
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+        _context.ContactFiles.Add(file);
+        await _context.SaveChangesAsync();
+
+        // Act
+        await _contactService.DeleteContactFileAsync(contact.Id, file.Id);
+
+        // Assert
+        _uploadServiceMock.Verify(x => x.DeleteFileAsync(It.IsAny<string>()), Times.Never);
+        var deletedFile = await _context.ContactFiles.FindAsync(file.Id);
+        Assert.Null(deletedFile);
+    }
+
+    [Fact]
+    public async Task CreateContactMessageAsync_Should_Throw_DuplicateInquiryException_When_Duplicate_Detected()
+    {
+        // Arrange
+        var email = "duplicate@example.com";
+        var contact = new ContactMessage
+        {
+            FullName = "First",
+            Email = email,
+            Subject = "Sub",
+            Message = "Msg",
+            CountryId = 1,
+            CreatedAt = DateTimeOffset.UtcNow.AddSeconds(-30)
+        };
+        _context.ContactMessages.Add(contact);
+        await _context.SaveChangesAsync();
+
+        var request = new CreateContactMessageRequest
+        {
+            FullName = "Second",
+            Email = email,
+            Subject = "Sub",
+            Message = "Msg",
+            CountryId = 1
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<DuplicateInquiryException>(() => _contactService.CreateContactMessageAsync(request));
+    }
+
+    [Fact]
+    public async Task CreateContactMessageAsync_Should_Throw_ArgumentException_When_Country_Invalid()
+    {
+        // Arrange
+        var request = new CreateContactMessageRequest
+        {
+            FullName = "Test",
+            Email = "test@example.com",
+            Subject = "Sub",
+            Message = "Msg",
+            CountryId = 99
+        };
+        _countryServiceMock.Setup(x => x.ValidateCountryExistsAsync(99, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() => _contactService.CreateContactMessageAsync(request));
+        Assert.Contains("Country ID 99 is not valid", ex.Message);
+    }
+
+    [Fact]
+    public async Task GetContactFilesAsync_Should_Return_Files()
+    {
+        // Arrange
+        var contact = new ContactMessage { FullName = "Test", Email = "test@example.com", Subject = "Test", Message = "Test", CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow };
+        _context.ContactMessages.Add(contact);
+        await _context.SaveChangesAsync();
+
+        var file = new ContactFile
+        {
+            ContactMessageId = contact.Id,
+            FileName = "test.txt",
+            ObjectName = "obj",
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+        _context.ContactFiles.Add(file);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _contactService.GetContactFilesAsync(contact.Id);
+
+        // Assert
+        Assert.Single(result);
+        Assert.Equal(file.FileName, result.First().FileName);
+    }
+
+    [Fact]
+    public async Task GetCacheVersionAsync_Should_Handle_Invalid_Bytes()
+    {
+        // Arrange
+        _cacheMock.Setup(c => c.GetAsync(ListCacheVersionKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new byte[] { 1, 2, 3 }); // Less than 8 bytes
+
+        // Act
+        // This will be triggered by calling GetContactMessagesAsync
+        var result = await _contactService.GetContactMessagesAsync();
+
+        // Assert
+        // We can't directly check the private version, but we ensure it doesn't crash and uses default 1
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task UpdateContactStatusAsync_Should_Throw_InvalidOperationException_On_Concurrency_Conflict()
+    {
+        // Arrange
+        var options = new DbContextOptionsBuilder<ContactDbContext>()
+            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .Options;
+
+        using var context = new MockContactDbContext(options);
+        var contact = new ContactMessage
+        {
+            Id = 1,
+            FullName = "Test",
+            Email = "test@example.com",
+            Subject = "Sub",
+            Message = "Msg",
+            CountryId = 1,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        context.ContactMessages.Add(contact);
+        await context.SaveChangesAsync();
+
+        var service = new Api.Services.ContactService(context, _cacheMock.Object, _uploadServiceMock.Object, _countryServiceMock.Object, _loggerMock.Object);
+        var updateRequest = new UpdateContactStatusRequest { Status = ContactStatus.InProgress };
+
+        context.ThrowOnSave = true;
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.UpdateContactStatusAsync(contact.Id, updateRequest));
+    }
+
+    private class MockContactDbContext : ContactDbContext
+    {
+        public bool ThrowOnSave { get; set; }
+        public MockContactDbContext(DbContextOptions<ContactDbContext> options) : base(options) { }
+
+        public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            if (ThrowOnSave) throw new DbUpdateConcurrencyException();
+            return base.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    [Fact]
     public async Task DeleteContactMessageAsync_Should_Delete_Successfully()
+
     {
         // Arrange
         var contact = new ContactMessage
@@ -399,7 +715,55 @@ public class ContactServiceTests : IClassFixture<CustomWebApplicationFactory<Pro
     }
 
     [Fact]
+    public async Task DeleteContactFileAsync_Should_Continue_When_UploadService_Fails()
+    {
+        // Arrange
+        var contact = new ContactMessage
+        {
+            FullName = "File Delete Fail Test",
+            Email = "filedeletefail@example.com",
+            Subject = "Subject",
+            Message = "Message",
+            CountryId = 1,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        _context.ContactMessages.Add(contact);
+        await _context.SaveChangesAsync();
+
+        var contactFile = new ContactFile
+        {
+            ContactMessageId = contact.Id,
+            FileName = "test.pdf",
+            ObjectName = "obj",
+            UploadServiceFileId = "file123",
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+        _context.ContactFiles.Add(contactFile);
+        await _context.SaveChangesAsync();
+
+        _uploadServiceMock.Setup(x => x.DeleteFileAsync(It.IsAny<string>()))
+            .ThrowsAsync(new Exception("Delete failed"));
+
+        // Act
+        await _contactService.DeleteContactFileAsync(contact.Id, contactFile.Id);
+
+        // Assert
+        var deletedFile = await _context.ContactFiles.FindAsync(contactFile.Id);
+        Assert.Null(deletedFile);
+        _loggerMock.Verify(
+            x => x.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Failed to delete file from UploadService")),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task CreateContactMessageAsync_Should_Throw_ArgumentNullException_When_Request_Is_Null()
+
     {
         Func<Task> act = async () => await _contactService.CreateContactMessageAsync(null!);
         await Assert.ThrowsAsync<ArgumentNullException>(act);

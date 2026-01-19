@@ -516,5 +516,78 @@ public class ContactsControllerTests
         Assert.NotNull(allowAnonymousAttribute);
         Assert.Single(allowAnonymousAttribute);
     }
+    [Fact]
+    public async Task GetContactMessages_Should_Return_InternalServerError_On_Exception()
+    {
+        // Arrange
+        var pagination = new PaginationParameters { Page = 1, PageSize = 20 };
+        _contactServiceMock.Setup(x => x.GetContactMessagesAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<ContactStatus?>(), It.IsAny<ContactType?>(), It.IsAny<string?>()))
+            .ThrowsAsync(new Exception("Test exception"));
 
+        // Act
+        var result = await _controller.GetContactMessages(pagination);
+
+        // Assert
+        var statusCodeResult = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(500, statusCodeResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetContactMessage_Should_Return_InternalServerError_On_Exception()
+    {
+        // Arrange
+        _contactServiceMock.Setup(x => x.GetContactMessageByIdAsync(It.IsAny<int>()))
+            .ThrowsAsync(new Exception("Test exception"));
+
+        // Act
+        var result = await _controller.GetContactMessage(1);
+
+        // Assert
+        var statusCodeResult = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(500, statusCodeResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetContactFiles_Should_Return_InternalServerError_On_Exception()
+    {
+        // Arrange
+        _contactServiceMock.Setup(x => x.GetContactFilesAsync(It.IsAny<int>()))
+            .ThrowsAsync(new Exception("Test exception"));
+
+        // Act
+        var result = await _controller.GetContactFiles(1);
+
+        // Assert
+        var statusCodeResult = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(500, statusCodeResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task DownloadContactFile_Should_Return_InternalServerError_On_Exception()
+    {
+        // Arrange
+        var file = new ContactFileDto { Id = 1, FileName = "test.txt", UploadServiceFileId = "id", ObjectName = "obj", CreatedAt = DateTime.UtcNow };
+        _contactServiceMock.Setup(x => x.GetContactFileByIdAsync(It.IsAny<int>(), It.IsAny<int>()))
+            .ReturnsAsync(file);
+        _uploadServiceMock.Setup(x => x.DownloadFileAsync(It.IsAny<string>()))
+            .ThrowsAsync(new Exception("Test exception"));
+
+        // Act
+        var result = await _controller.DownloadContactFile(1, 1);
+
+        // Assert
+        var statusCodeResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(500, statusCodeResult.StatusCode);
+    }
+
+    [Fact]
+    public void MergeContacts_Should_Return_Ok()
+    {
+        // Act
+        var result = _controller.MergeContacts(1);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.NotNull(okResult.Value);
+    }
 }

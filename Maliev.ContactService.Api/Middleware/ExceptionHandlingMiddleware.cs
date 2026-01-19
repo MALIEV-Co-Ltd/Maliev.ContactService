@@ -1,6 +1,6 @@
+using Maliev.ContactService.Api.Exceptions;
 using System.Net;
 using System.Text.Json;
-using Maliev.ContactService.Api.Exceptions;
 
 namespace Maliev.ContactService.Api.Middleware;
 

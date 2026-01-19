@@ -70,4 +70,35 @@ public class ContactsControllerIntegrationTests : IClassFixture<CustomWebApplica
         var contact = await response.Content.ReadFromJsonAsync<ContactMessageDto>();
         Assert.NotNull(contact);
     }
+
+    [Fact]
+    public async Task CreateContactMessage_Should_Return_BadRequest_When_ModelInvalid()
+    {
+        // Arrange
+        var request = new CreateContactMessageRequest
+        {
+            FullName = "", // Invalid
+            Email = "invalid-email",
+            Subject = "Test Subject",
+            Message = "Test Message",
+            CountryId = 1,
+            ContactType = ContactType.General
+        };
+
+        // Act
+        var response = await _client.PostAsJsonAsync("/contact/v1/contacts", request);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetContactMessage_Should_Return_NotFound_When_NotExists()
+    {
+        // Act - Use an integer ID that doesn't exist (e.g., 999999)
+        var response = await _client.GetAsync("/contact/v1/contacts/999999");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
 }

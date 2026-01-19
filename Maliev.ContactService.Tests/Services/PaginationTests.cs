@@ -32,6 +32,7 @@ public class PaginationTests : IClassFixture<CustomWebApplicationFactory<Program
     public async Task InitializeAsync()
     {
         await _factory.InitializeAsync();
+        await _factory.CleanDatabaseAsync(); // Added to ensure database is empty before seeding in each test
         _context = _factory.CreateDbContext();
         _cacheMock = new Mock<IDistributedCache>();
         _uploadServiceMock = new Mock<IUploadServiceClient>();

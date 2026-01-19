@@ -1,17 +1,11 @@
+using Maliev.Aspire.ServiceDefaults;
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.ContactService.Api.Middleware;
-using Maliev.ContactService.Api.Models;
 using Maliev.ContactService.Api.Services;
 using Maliev.ContactService.Api.Services.Auth;
 using Maliev.ContactService.Data.DbContexts;
-using Maliev.Aspire.ServiceDefaults;
-using Maliev.Aspire.ServiceDefaults.Authorization;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.HttpOverrides;
-using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Logging;
-using System.Threading.RateLimiting;
-using System.Threading.Channels;
 using Maliev.ContactService.Data.Models;
+using System.Threading.RateLimiting;
 
 // Initialize bootstrap logging
 using var loggerFactory = LoggerFactory.Create(logBuilder => logBuilder.AddConsole());

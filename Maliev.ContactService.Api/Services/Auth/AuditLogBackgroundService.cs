@@ -1,7 +1,7 @@
-using System.Threading.Channels;
 using Maliev.ContactService.Data.DbContexts;
 using Maliev.ContactService.Data.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Threading.Channels;
 
 namespace Maliev.ContactService.Api.Services.Auth;
 

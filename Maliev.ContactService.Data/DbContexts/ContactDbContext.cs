@@ -1,6 +1,6 @@
+using Maliev.Aspire.ServiceDefaults.Database;
 using Maliev.ContactService.Data.Models;
 using Microsoft.EntityFrameworkCore;
-using Maliev.Aspire.ServiceDefaults.Database;
 
 namespace Maliev.ContactService.Data.DbContexts;
 

@@ -22,6 +22,9 @@ using Xunit;
 using Moq;
 using Maliev.ContactService.Api.Services;
 
+// Disable parallel execution to prevent race conditions on the shared singleton database
+[assembly: CollectionBehavior(DisableTestParallelization = true)]
+
 namespace Maliev.ContactService.Tests.Testing;
 
 /// <summary>
@@ -34,11 +37,17 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
     where TProgram : class
     where TDbContext : DbContext
 {
-    private readonly PostgreSqlContainer _postgresContainer;
-    private readonly RedisContainer _redisContainer;
-    private readonly RabbitMqContainer _rabbitmqContainer;
+    private static PostgreSqlContainer? _postgresContainer;
+    private static RedisContainer? _redisContainer;
+    private static RabbitMqContainer? _rabbitmqContainer;
+    private static bool _containersStarted;
+    private static readonly SemaphoreSlim _initLock = new(1, 1);
+
     private readonly RSA _testRsa;
-    private bool _containersStarted;
+
+    // Flags for one-time seeding
+    private static bool _dataSeeded;
+    private static readonly SemaphoreSlim _seedLock = new(1, 1);
 
     /// <summary>
     /// Override this property if your DbContext connection string has a different name.
@@ -48,18 +57,6 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
     public BaseIntegrationTestFactory()
     {
-        _postgresContainer = new PostgreSqlBuilder()
-            .WithImage("postgres:18-alpine")
-            .Build();
-
-        _redisContainer = new RedisBuilder()
-            .WithImage("redis:8.4-alpine")
-            .Build();
-
-        _rabbitmqContainer = new RabbitMqBuilder()
-            .WithImage("rabbitmq:4.2-alpine")
-            .Build();
-
         _testRsa = RSA.Create(2048);
     }
 
@@ -71,37 +68,104 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
     public async Task InitializeAsync()
     {
-        if (_containersStarted)
-            return;
+        await _initLock.WaitAsync();
+        try
+        {
+            if (!_containersStarted)
+            {
+                _postgresContainer = new PostgreSqlBuilder()
+                    .WithImage("postgres:18-alpine")
+                    .Build();
 
-        // Start all containers in parallel
-        await Task.WhenAll(
-            _postgresContainer.StartAsync(),
-            _redisContainer.StartAsync(),
-            _rabbitmqContainer.StartAsync()
-        );
+                _redisContainer = new RedisBuilder()
+                    .WithImage("redis:8.4-alpine")
+                    .Build();
+
+                _rabbitmqContainer = new RabbitMqBuilder()
+                    .WithImage("rabbitmq:4.2-alpine")
+                    .Build();
+
+                // Start all containers in parallel
+                await Task.WhenAll(
+                    _postgresContainer.StartAsync(),
+                    _redisContainer.StartAsync(),
+                    _rabbitmqContainer.StartAsync()
+                );
+
+                // Ensure PostgreSQL is fully ready and accepting connections
+                var postgresReady = false;
+                var retryCount = 0;
+                const int maxRetries = 60;
+                while (!postgresReady && retryCount < maxRetries)
+                {
+                    try
+                    {
+                        await using var conn = new Npgsql.NpgsqlConnection(_postgresContainer.GetConnectionString());
+                        await conn.OpenAsync();
+                        await using var cmd = conn.CreateCommand();
+                        cmd.CommandText = "SELECT 1";
+                        await cmd.ExecuteScalarAsync();
+                        postgresReady = true;
+                    }
+                    catch
+                    {
+                        retryCount++;
+                        await Task.Delay(1000);
+                    }
+                }
+
+                if (!postgresReady)
+                {
+                    throw new InvalidOperationException("PostgreSQL Testcontainer failed to become ready (Ping failed) after 60 seconds.");
+                }
+
+                // Wait for Redis to be ready
+                using (var connection = await StackExchange.Redis.ConnectionMultiplexer.ConnectAsync(_redisContainer.GetConnectionString()))
+                {
+                    await connection.GetDatabase().PingAsync();
+                }
+
+                // Apply database migrations
+                await ApplyMigrationsAsync();
+
+                _containersStarted = true;
+            }
+        }
+        finally
+        {
+            _initLock.Release();
+        }
 
         // Connection strings are injected into the test host's configuration via ConfigureWebHost
 
-        // Wait for Redis to be ready
-        using (var connection = await StackExchange.Redis.ConnectionMultiplexer.ConnectAsync(_redisContainer.GetConnectionString()))
-        {
-            await connection.GetDatabase().PingAsync();
-        }
+        // Seed authorization data ONE TIME only
+        await SeedDataOnceAsync();
+    }
 
-        // Apply database migrations
-        await ApplyMigrationsAsync();
+    private async Task SeedDataOnceAsync()
+    {
+        if (_dataSeeded) return;
 
-        // Seed authorization data using a fresh context to avoid recursive loop via Services property
-        await using (var dbContext = CreateDbContext())
+        await _seedLock.WaitAsync();
+        try
         {
-            if (dbContext is Maliev.ContactService.Data.DbContexts.ContactDbContext contactDbContext)
+            if (_dataSeeded) return;
+
+            // Seed authorization data using a fresh context to avoid recursive loop via Services property
+            await using (var dbContext = CreateDbContext())
             {
-                await Maliev.ContactService.Api.Services.Auth.DataSeeder.SeedAuthDataAsync(contactDbContext);
+                if (dbContext is Maliev.ContactService.Data.DbContexts.ContactDbContext contactDbContext)
+                {
+                    await Maliev.ContactService.Api.Services.Auth.DataSeeder.SeedAuthDataAsync(contactDbContext);
+                }
             }
-        }
 
-        _containersStarted = true;
+            _dataSeeded = true;
+        }
+        finally
+        {
+            _seedLock.Release();
+        }
     }
 
     public new async Task DisposeAsync()
@@ -109,20 +173,21 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         // Stop background services first to avoid them trying to access databases during container shutdown
         try
         {
-            var hostedServices = Services.GetServices<IHostedService>();
-            foreach (var service in hostedServices)
+            if (Services != null)
             {
-                if (service is Maliev.ContactService.Api.Services.Auth.AuditLogBackgroundService)
+                var hostedServices = Services.GetServices<IHostedService>();
+                foreach (var service in hostedServices)
                 {
-                    await service.StopAsync(CancellationToken.None);
+                    if (service is Maliev.ContactService.Api.Services.Auth.AuditLogBackgroundService)
+                    {
+                        await service.StopAsync(CancellationToken.None);
+                    }
                 }
             }
         }
-        catch (ObjectDisposedException) { }
+        catch (Exception) { }
 
-        await _postgresContainer.DisposeAsync();
-        await _redisContainer.DisposeAsync();
-        await _rabbitmqContainer.DisposeAsync();
+        // Static containers are NOT disposed here to allow reuse across tests
         _testRsa.Dispose();
         await base.DisposeAsync();
     }
@@ -151,9 +216,9 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         {
             var dict = new Dictionary<string, string?>
             {
-                [$"ConnectionStrings:{DbConnectionStringName}"] = _postgresContainer.GetConnectionString(),
-                ["ConnectionStrings:redis"] = _redisContainer.GetConnectionString(),
-                ["ConnectionStrings:rabbitmq"] = _rabbitmqContainer.GetConnectionString(),
+                [$"ConnectionStrings:{DbConnectionStringName}"] = _postgresContainer!.GetConnectionString(),
+                ["ConnectionStrings:redis"] = _redisContainer!.GetConnectionString(),
+                ["ConnectionStrings:rabbitmq"] = _rabbitmqContainer!.GetConnectionString(),
                 ["ExternalServices:CountryService:BaseUrl"] = "http://localhost:5000",
                 ["ExternalServices:UploadService:BaseUrl"] = "http://localhost:5001",
                 ["Jwt:PublicKey"] = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(_testRsa.ExportRSAPublicKeyPem())),
@@ -183,9 +248,9 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         {
             var dict = new Dictionary<string, string?>
             {
-                [$"ConnectionStrings:{DbConnectionStringName}"] = _postgresContainer.GetConnectionString(),
-                ["ConnectionStrings:redis"] = _redisContainer.GetConnectionString(),
-                ["ConnectionStrings:rabbitmq"] = _rabbitmqContainer.GetConnectionString(),
+                [$"ConnectionStrings:{DbConnectionStringName}"] = _postgresContainer!.GetConnectionString(),
+                ["ConnectionStrings:redis"] = _redisContainer!.GetConnectionString(),
+                ["ConnectionStrings:rabbitmq"] = _rabbitmqContainer!.GetConnectionString(),
                 ["ExternalServices:CountryService:BaseUrl"] = "http://localhost:5000",
                 ["ExternalServices:UploadService:BaseUrl"] = "http://localhost:5001",
                 ["Jwt:PublicKey"] = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(_testRsa.ExportRSAPublicKeyPem())),
@@ -297,7 +362,7 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
     /// </summary>
     public TDbContext CreateDbContext()
     {
-        var connectionString = _postgresContainer.GetConnectionString();
+        var connectionString = _postgresContainer!.GetConnectionString();
         var optionsBuilder = new DbContextOptionsBuilder<TDbContext>();
         optionsBuilder.UseNpgsql(connectionString);
         return (TDbContext)Activator.CreateInstance(typeof(TDbContext), optionsBuilder.Options)!;
@@ -377,6 +442,10 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
     /// <summary>
     /// Creates a test JWT token for authentication in integration tests.
     /// </summary>
+    /// <param name="userId">User ID to include in token</param>
+    /// <param name="roles">Roles to include in token claims</param>
+    /// <param name="additionalClaims">Additional claims to include</param>
+    /// <returns>JWT token string</returns>
     public string CreateTestJwtToken(
         string userId = "test-user",
         string[]? roles = null,
@@ -404,7 +473,7 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         {
             foreach (var role in roles)
             {
-                claims.Add(new Claim("role", role));
+                claims.Add(new Claim(ClaimTypes.Role, role));
             }
         }
 
@@ -454,7 +523,7 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
     {
         var token = CreateTestJwtToken(userId, roles, permissions);
         var client = CreateClient();
-        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        client.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
         return client;
     }
 }

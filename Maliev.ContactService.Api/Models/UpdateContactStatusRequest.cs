@@ -1,5 +1,5 @@
-using System.ComponentModel.DataAnnotations;
 using Maliev.ContactService.Data.Models;
+using System.ComponentModel.DataAnnotations;
 
 namespace Maliev.ContactService.Api.Models;
 /// <summary>

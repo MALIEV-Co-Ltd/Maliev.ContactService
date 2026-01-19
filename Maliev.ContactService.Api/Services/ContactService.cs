@@ -4,8 +4,8 @@ using Maliev.ContactService.Data.DbContexts;
 using Maliev.ContactService.Data.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
-using System.Text.Json;
 using System.Text;
+using System.Text.Json;
 
 namespace Maliev.ContactService.Api.Services;
 

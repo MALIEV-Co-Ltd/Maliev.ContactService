@@ -1,5 +1,5 @@
-using System.Security.Claims;
 using Maliev.ContactService.Api.Services.Auth;
+using System.Security.Claims;
 
 namespace Maliev.ContactService.Api.Middleware;
 
