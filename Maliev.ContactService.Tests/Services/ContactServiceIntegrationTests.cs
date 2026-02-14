@@ -26,7 +26,7 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
 
     public ContactServiceIntegrationTests()
     {
-        _dbContainer = new PostgreSqlBuilder().WithName("postgres:18-alpine")
+        _dbContainer = new PostgreSqlBuilder().WithImage("postgres:18-alpine")
             .Build();
 
         _cacheMock = new Mock<IDistributedCache>();

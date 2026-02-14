@@ -414,7 +414,7 @@ public class LocalTestWebApplicationFactory : WebApplicationFactory<Program>, IA
     {
         if (_postgresContainer != null) return;
 
-        _postgresContainer = new PostgreSqlBuilder().WithName("postgres:18-alpine")
+        _postgresContainer = new PostgreSqlBuilder().WithImage("postgres:18-alpine")
             .WithDatabase("contact_test_db")
             .WithUsername("postgres")
             .WithPassword("test_password")
