@@ -93,7 +93,7 @@ public class LocalIntegrationTests : IClassFixture<CustomWebApplicationFactory<P
             Email = testEmail,
             Subject = "Duplicate Prevention Test",
             Message = "Testing duplicate inquiry prevention",
-            CountryId = 1,
+            CountryId = Guid.Empty,
             ContactType = ContactType.General,
             Priority = Priority.Medium,
             Files = new List<CreateContactFileRequest>()
@@ -130,7 +130,7 @@ public class LocalIntegrationTests : IClassFixture<CustomWebApplicationFactory<P
             Email = testEmail1,
             Subject = "Test Subject",
             Message = "Test Message",
-            CountryId = 1,
+            CountryId = Guid.Empty,
             ContactType = ContactType.General,
             Priority = Priority.Medium,
             Files = new List<CreateContactFileRequest>()
@@ -142,7 +142,7 @@ public class LocalIntegrationTests : IClassFixture<CustomWebApplicationFactory<P
             Email = testEmail2,
             Subject = "Test Subject",
             Message = "Test Message",
-            CountryId = 1,
+            CountryId = Guid.Empty,
             ContactType = ContactType.General,
             Priority = Priority.Medium,
             Files = new List<CreateContactFileRequest>()
@@ -173,7 +173,7 @@ public class LocalIntegrationTests : IClassFixture<CustomWebApplicationFactory<P
             Email = $"countrytest.{Guid.NewGuid():N}@example.com",
             Subject = "Country Service Unavailability Test",
             Message = "Testing Country Service failure handling",
-            CountryId = 1,
+            CountryId = Guid.Empty,
             ContactType = ContactType.General,
             Priority = Priority.Medium,
             Files = new List<CreateContactFileRequest>()
@@ -202,7 +202,7 @@ public class LocalIntegrationTests : IClassFixture<CustomWebApplicationFactory<P
             Email = testEmail,
             Subject = "Test",
             Message = "Test",
-            CountryId = 1,
+            CountryId = Guid.Empty,
             ContactType = ContactType.General,
             Priority = Priority.Medium,
             Files = new List<CreateContactFileRequest>()
@@ -239,7 +239,7 @@ public class LocalIntegrationTests : IClassFixture<CustomWebApplicationFactory<P
             Email = testEmail,
             Subject = "Test with Valid Country",
             Message = "Testing valid countryId submission",
-            CountryId = 1, // Valid country ID
+            CountryId = Guid.NewGuid(), // Valid country ID
             ContactType = ContactType.General,
             Priority = Priority.Medium,
             Files = new List<CreateContactFileRequest>()
@@ -254,7 +254,7 @@ public class LocalIntegrationTests : IClassFixture<CustomWebApplicationFactory<P
         var contactDto = await response.Content.ReadFromJsonAsync<ContactMessageDto>();
         Assert.NotNull(contactDto);
         Assert.Equal(testEmail, contactDto!.Email);
-        Assert.Equal(1, contactDto.CountryId);
+        Assert.Equal(Guid.Empty, contactDto.CountryId);
     }
 
     [Fact]
@@ -268,7 +268,7 @@ public class LocalIntegrationTests : IClassFixture<CustomWebApplicationFactory<P
             Email = testEmail,
             Subject = "Test with Invalid Country",
             Message = "Testing invalid countryId submission",
-            CountryId = 9999, // Out of valid range
+            CountryId = new Guid("00000000-0000-0000-0000-000000000001"), // Invalid country ID
             ContactType = ContactType.General,
             Priority = Priority.Medium,
             Files = new List<CreateContactFileRequest>()
@@ -292,7 +292,7 @@ public class LocalIntegrationTests : IClassFixture<CustomWebApplicationFactory<P
             email = testEmail,
             subject = "Quotation Request",
             message = "Testing quotation type rejection",
-            countryId = 1,
+            countryId = Guid.Empty,
             contactType = 2, // Quotation (removed type)
             priority = 1,
             files = new List<object>()
@@ -382,7 +382,7 @@ public class LocalIntegrationTests : IClassFixture<CustomWebApplicationFactory<P
 /// </summary>
 public class FailingCountryServiceClient : ICountryServiceClient
 {
-    public Task<bool> ValidateCountryExistsAsync(int countryId, CancellationToken cancellationToken = default)
+    public Task<bool> ValidateCountryExistsAsync(Guid countryId, CancellationToken cancellationToken = default)
     {
         return Task.FromException<bool>(
             new CountryServiceException("Country Service is currently unavailable. Please try again in a few moments."));
@@ -409,8 +409,7 @@ public class LocalTestWebApplicationFactory : WebApplicationFactory<Program>, IA
     {
         if (_postgresContainer != null) return;
 
-        _postgresContainer = new PostgreSqlBuilder()
-            .WithImage("postgres:18-alpine")
+        _postgresContainer = new PostgreSqlBuilder().WithName("postgres:18-alpine")
             .WithDatabase("contact_test_db")
             .WithUsername("postgres")
             .WithPassword("test_password")

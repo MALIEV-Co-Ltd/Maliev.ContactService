@@ -44,7 +44,7 @@ public class ContactServiceTests : IClassFixture<CustomWebApplicationFactory<Pro
         _countryServiceMock = new Mock<ICountryServiceClient>();
         _loggerMock = new Mock<ILogger<Api.Services.ContactService>>();
 
-        _countryServiceMock.Setup(x => x.ValidateCountryExistsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        _countryServiceMock.Setup(x => x.ValidateCountryExistsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
         _cacheMock.Setup(c => c.GetAsync(ListCacheVersionKey, It.IsAny<CancellationToken>()))
@@ -69,7 +69,7 @@ public class ContactServiceTests : IClassFixture<CustomWebApplicationFactory<Pro
             Email = "john.doe@example.com",
             Subject = "Test Inquiry",
             Message = "This is a test message",
-            CountryId = 1,
+            CountryId = Guid.Empty,
             ContactType = ContactType.General,
             Priority = Priority.High,
             Files = new List<CreateContactFileRequest>()
@@ -94,7 +94,7 @@ public class ContactServiceTests : IClassFixture<CustomWebApplicationFactory<Pro
             Email = "jane.doe@example.com",
             Subject = "Quotation Request",
             Message = "Please provide a quote",
-            CountryId = 1,
+            CountryId = Guid.Empty,
             ContactType = ContactType.General,
             Files = new List<CreateContactFileRequest>
             {
@@ -145,7 +145,7 @@ public class ContactServiceTests : IClassFixture<CustomWebApplicationFactory<Pro
             Email = "test@example.com",
             Subject = "Test Subject",
             Message = "Test Message",
-            CountryId = 1,
+            CountryId = Guid.Empty,
             ContactType = ContactType.Business,
             Priority = Priority.Medium,
             Status = ContactStatus.New,
@@ -207,7 +207,7 @@ public class ContactServiceTests : IClassFixture<CustomWebApplicationFactory<Pro
             Email = "update@example.com",
             Subject = "Update Subject",
             Message = "Update Message",
-            CountryId = 1,
+            CountryId = Guid.Empty,
             ContactType = ContactType.General,
             Priority = Priority.Medium,
             Status = ContactStatus.New,
@@ -244,7 +244,7 @@ public class ContactServiceTests : IClassFixture<CustomWebApplicationFactory<Pro
             Email = "concurrent@example.com",
             Subject = "Subject",
             Message = "Message",
-            CountryId = 1,
+            CountryId = Guid.Empty,
             ContactType = ContactType.General,
             Priority = Priority.Medium,
             Status = ContactStatus.New,
@@ -285,7 +285,7 @@ public class ContactServiceTests : IClassFixture<CustomWebApplicationFactory<Pro
             Email = "resolve@example.com",
             Subject = "Resolve Subject",
             Message = "Resolve Message",
-            CountryId = 1,
+            CountryId = Guid.Empty,
             ContactType = ContactType.General,
             Priority = Priority.Medium,
             Status = ContactStatus.InProgress,
@@ -325,7 +325,7 @@ public class ContactServiceTests : IClassFixture<CustomWebApplicationFactory<Pro
                 Email = $"user{i}@example.com",
                 Subject = $"Subject {i}",
                 Message = $"Message {i}",
-                CountryId = 1,
+                CountryId = Guid.Empty,
                 ContactType = i % 2 == 0 ? ContactType.General : ContactType.Business,
                 Priority = Priority.Medium,
                 Status = ContactStatus.New,
@@ -353,9 +353,9 @@ public class ContactServiceTests : IClassFixture<CustomWebApplicationFactory<Pro
         // Arrange
         _context.ContactMessages.AddRange(new[]
         {
-            new ContactMessage { FullName = "User 1", Email = "user1@example.com", Subject = "Subject 1", Message = "Message 1", CountryId = 1, Status = ContactStatus.New, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow },
-            new ContactMessage { FullName = "User 2", Email = "user2@example.com", Subject = "Subject 2", Message = "Message 2", CountryId = 1, Status = ContactStatus.InProgress, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow },
-            new ContactMessage { FullName = "User 3", Email = "user3@example.com", Subject = "Subject 3", Message = "Message 3", CountryId = 1, Status = ContactStatus.Resolved, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow }
+            new ContactMessage { FullName = "User 1", Email = "user1@example.com", Subject = "Subject 1", Message = "Message 1", CountryId = Guid.Empty, Status = ContactStatus.New, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow },
+            new ContactMessage { FullName = "User 2", Email = "user2@example.com", Subject = "Subject 2", Message = "Message 2", CountryId = Guid.Empty, Status = ContactStatus.InProgress, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow },
+            new ContactMessage { FullName = "User 3", Email = "user3@example.com", Subject = "Subject 3", Message = "Message 3", CountryId = Guid.Empty, Status = ContactStatus.Resolved, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow }
         });
         await _context.SaveChangesAsync();
 
@@ -373,8 +373,8 @@ public class ContactServiceTests : IClassFixture<CustomWebApplicationFactory<Pro
         // Arrange
         _context.ContactMessages.AddRange(new[]
         {
-            new ContactMessage { FullName = "User 1", Email = "user1@example.com", Subject = "Subject 1", Message = "Message 1", CountryId = 1, ContactType = ContactType.General, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow },
-            new ContactMessage { FullName = "User 2", Email = "user2@example.com", Subject = "Subject 2", Message = "Message 2", CountryId = 1, ContactType = ContactType.Business, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow }
+            new ContactMessage { FullName = "User 1", Email = "user1@example.com", Subject = "Subject 1", Message = "Message 1", CountryId = Guid.Empty, ContactType = ContactType.General, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow },
+            new ContactMessage { FullName = "User 2", Email = "user2@example.com", Subject = "Subject 2", Message = "Message 2", CountryId = Guid.Empty, ContactType = ContactType.Business, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow }
         });
         await _context.SaveChangesAsync();
 
@@ -392,8 +392,8 @@ public class ContactServiceTests : IClassFixture<CustomWebApplicationFactory<Pro
         // Arrange
         _context.ContactMessages.AddRange(new[]
         {
-            new ContactMessage { FullName = "User 1", Email = "user1@example.com", Subject = "Subject 1", Message = "Message 1", CountryId = 1, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow },
-            new ContactMessage { FullName = "User 2", Email = "user2@example.com", Subject = "Subject 2", Message = "Message 2", CountryId = 1, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow }
+            new ContactMessage { FullName = "User 1", Email = "user1@example.com", Subject = "Subject 1", Message = "Message 1", CountryId = Guid.Empty, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow },
+            new ContactMessage { FullName = "User 2", Email = "user2@example.com", Subject = "Subject 2", Message = "Message 2", CountryId = Guid.Empty, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow }
         });
         await _context.SaveChangesAsync();
 
@@ -516,7 +516,7 @@ public class ContactServiceTests : IClassFixture<CustomWebApplicationFactory<Pro
             Email = email,
             Subject = "Sub",
             Message = "Msg",
-            CountryId = 1,
+            CountryId = Guid.Empty,
             CreatedAt = DateTimeOffset.UtcNow.AddSeconds(-30)
         };
         _context.ContactMessages.Add(contact);
@@ -528,7 +528,7 @@ public class ContactServiceTests : IClassFixture<CustomWebApplicationFactory<Pro
             Email = email,
             Subject = "Sub",
             Message = "Msg",
-            CountryId = 1
+            CountryId = Guid.Empty
         };
 
         // Act & Assert
@@ -539,20 +539,21 @@ public class ContactServiceTests : IClassFixture<CustomWebApplicationFactory<Pro
     public async Task CreateContactMessageAsync_Should_Throw_ArgumentException_When_Country_Invalid()
     {
         // Arrange
+        var countryId = Guid.NewGuid();
         var request = new CreateContactMessageRequest
         {
             FullName = "Test",
             Email = "test@example.com",
             Subject = "Sub",
             Message = "Msg",
-            CountryId = 99
+            CountryId = countryId
         };
-        _countryServiceMock.Setup(x => x.ValidateCountryExistsAsync(99, It.IsAny<CancellationToken>()))
+        _countryServiceMock.Setup(x => x.ValidateCountryExistsAsync(countryId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
         // Act & Assert
         var ex = await Assert.ThrowsAsync<ArgumentException>(() => _contactService.CreateContactMessageAsync(request));
-        Assert.Contains("Country ID 99 is not valid", ex.Message);
+        Assert.Contains($"Country ID {countryId} is not valid", ex.Message);
     }
 
     [Fact]
@@ -613,7 +614,7 @@ public class ContactServiceTests : IClassFixture<CustomWebApplicationFactory<Pro
             Email = "test@example.com",
             Subject = "Sub",
             Message = "Msg",
-            CountryId = 1,
+            CountryId = Guid.Empty,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow
         };
@@ -652,7 +653,7 @@ public class ContactServiceTests : IClassFixture<CustomWebApplicationFactory<Pro
             Email = "delete@example.com",
             Subject = "Delete Subject",
             Message = "Delete Message",
-            CountryId = 1,
+            CountryId = Guid.Empty,
             ContactType = ContactType.General,
             Priority = Priority.Medium,
             Status = ContactStatus.New,
@@ -681,7 +682,7 @@ public class ContactServiceTests : IClassFixture<CustomWebApplicationFactory<Pro
             Email = "filedelete@example.com",
             Subject = "File Delete Subject",
             Message = "File Delete Message",
-            CountryId = 1,
+            CountryId = Guid.Empty,
             ContactType = ContactType.General,
             Priority = Priority.Medium,
             Status = ContactStatus.New,
@@ -724,7 +725,7 @@ public class ContactServiceTests : IClassFixture<CustomWebApplicationFactory<Pro
             Email = "filedeletefail@example.com",
             Subject = "Subject",
             Message = "Message",
-            CountryId = 1,
+            CountryId = Guid.Empty,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow
         };
@@ -780,7 +781,7 @@ public class ContactServiceTests : IClassFixture<CustomWebApplicationFactory<Pro
             Subject = "Upload Fail Test Subject",
             Message = "This should still be created even though file upload fails",
             ContactType = ContactType.General,
-            CountryId = 1,
+            CountryId = Guid.Empty,
             Files = new List<CreateContactFileRequest>
             {
                 new CreateContactFileRequest

@@ -25,7 +25,7 @@ public class CountryServiceClientTests
     public async Task ValidateCountryExistsAsync_ReturnsTrue_WhenCountryIsActive()
     {
         // Arrange
-        var countryId = 1;
+        var countryId = Guid.NewGuid();
         var countryDto = new CountryDto { Id = countryId, Name = "Test Country", Iso2 = "TC", IsActive = true };
         var handlerMock = new Mock<HttpMessageHandler>();
         handlerMock
@@ -55,7 +55,7 @@ public class CountryServiceClientTests
     public async Task ValidateCountryExistsAsync_ReturnsFalse_WhenCountryNotFound()
     {
         // Arrange
-        var countryId = 1;
+        var countryId = Guid.NewGuid();
         var handlerMock = new Mock<HttpMessageHandler>();
         handlerMock
             .Protected()
@@ -83,7 +83,7 @@ public class CountryServiceClientTests
     public async Task ValidateCountryExistsAsync_ReturnsFalse_WhenCountryIsNotActive()
     {
         // Arrange
-        var countryId = 1;
+        var countryId = Guid.NewGuid();
         var countryDto = new CountryDto { Id = countryId, Name = "Test Country", Iso2 = "TC", IsActive = false };
         var handlerMock = new Mock<HttpMessageHandler>();
         handlerMock
@@ -113,7 +113,7 @@ public class CountryServiceClientTests
     public async Task ValidateCountryExistsAsync_ThrowsCountryServiceException_WhenApiReturnsError()
     {
         // Arrange
-        var countryId = 1;
+        var countryId = Guid.Empty;
         var handlerMock = new Mock<HttpMessageHandler>();
         handlerMock
             .Protected()
@@ -138,7 +138,7 @@ public class CountryServiceClientTests
     public async Task ValidateCountryExistsAsync_ThrowsCountryServiceException_WhenTimeoutOccurs()
     {
         // Arrange
-        var countryId = 1;
+        var countryId = Guid.Empty;
         var handlerMock = new Mock<HttpMessageHandler>();
         handlerMock
             .Protected()

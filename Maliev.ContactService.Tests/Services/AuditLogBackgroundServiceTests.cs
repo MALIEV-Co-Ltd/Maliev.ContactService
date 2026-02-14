@@ -18,8 +18,7 @@ public class AuditLogBackgroundServiceTests : IAsyncLifetime
 
     public AuditLogBackgroundServiceTests()
     {
-        _postgresContainer = new PostgreSqlBuilder()
-            .WithImage("postgres:18-alpine")
+        _postgresContainer = new PostgreSqlBuilder().WithName("postgres:18-alpine")
             .Build();
         _loggerMock = new Mock<ILogger<AuditLogBackgroundService>>();
     }

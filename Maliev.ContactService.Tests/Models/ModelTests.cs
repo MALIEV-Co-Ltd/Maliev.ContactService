@@ -204,8 +204,9 @@ public class ModelTests
     [Fact]
     public void CountryDto_Properties_Work()
     {
-        var dto = new CountryDto { Id = 1, Name = "Test", Iso2 = "TS", IsActive = true };
-        Assert.Equal(1, dto.Id);
+        var id = Guid.NewGuid();
+        var dto = new CountryDto { Id = id, Name = "Test", Iso2 = "TS", IsActive = true };
+        Assert.Equal(id, dto.Id);
         Assert.Equal("Test", dto.Name);
         Assert.Equal("TS", dto.Iso2);
         Assert.True(dto.IsActive);

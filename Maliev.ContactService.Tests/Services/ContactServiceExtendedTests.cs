@@ -63,14 +63,14 @@ public class ContactServiceExtendedTests : IClassFixture<CustomWebApplicationFac
             FullName = "First",
             Subject = "Sub",
             Message = "Msg",
-            CountryId = 1,
+            CountryId = Guid.Empty,
             CreatedAt = DateTimeOffset.UtcNow.AddSeconds(-30),
             UpdatedAt = DateTimeOffset.UtcNow.AddSeconds(-30)
         };
         _context.ContactMessages.Add(existing);
         await _context.SaveChangesAsync();
 
-        var request = new CreateContactMessageRequest { Email = email, FullName = "Second", CountryId = 1, Subject = "Sub", Message = "Msg" };
+        var request = new CreateContactMessageRequest { Email = email, FullName = "Second", CountryId = Guid.Empty, Subject = "Sub", Message = "Msg" };
 
         // Act & Assert
         await Assert.ThrowsAsync<DuplicateInquiryException>(() => _contactService.CreateContactMessageAsync(request));
@@ -80,10 +80,10 @@ public class ContactServiceExtendedTests : IClassFixture<CustomWebApplicationFac
     public async Task CreateContactMessageAsync_ShouldThrowArgumentException_IfCountryInvalid()
     {
         // Arrange
-        _countryServiceMock.Setup(x => x.ValidateCountryExistsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        _countryServiceMock.Setup(x => x.ValidateCountryExistsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
-        var request = new CreateContactMessageRequest { Email = "test@example.com", FullName = "Test", CountryId = 999, Subject = "Sub", Message = "Msg" };
+        var request = new CreateContactMessageRequest { Email = "test@example.com", FullName = "Test", CountryId = Guid.Empty, Subject = "Sub", Message = "Msg" };
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() => _contactService.CreateContactMessageAsync(request));
@@ -93,7 +93,7 @@ public class ContactServiceExtendedTests : IClassFixture<CustomWebApplicationFac
     public async Task GetContactFilesAsync_ShouldReturnFilesForContact()
     {
         // Arrange
-        var contact = new ContactMessage { Email = "f@e.com", FullName = "N", Subject = "S", Message = "M", CountryId = 1, CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow };
+        var contact = new ContactMessage { Email = "f@e.com", FullName = "N", Subject = "S", Message = "M", CountryId = Guid.Empty, CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow };
         _context.ContactMessages.Add(contact);
         await _context.SaveChangesAsync();
 
@@ -113,7 +113,7 @@ public class ContactServiceExtendedTests : IClassFixture<CustomWebApplicationFac
     public async Task GetContactFileByIdAsync_ShouldReturnSpecificFile()
     {
         // Arrange
-        var contact = new ContactMessage { Email = "f@e.com", FullName = "N", Subject = "S", Message = "M", CountryId = 1, CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow };
+        var contact = new ContactMessage { Email = "f@e.com", FullName = "N", Subject = "S", Message = "M", CountryId = Guid.Empty, CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow };
         _context.ContactMessages.Add(contact);
         await _context.SaveChangesAsync();
 

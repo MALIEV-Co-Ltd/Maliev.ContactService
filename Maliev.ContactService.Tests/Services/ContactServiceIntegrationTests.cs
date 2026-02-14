@@ -26,8 +26,7 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
 
     public ContactServiceIntegrationTests()
     {
-        _dbContainer = new PostgreSqlBuilder()
-            .WithImage("postgres:18-alpine")
+        _dbContainer = new PostgreSqlBuilder().WithName("postgres:18-alpine")
             .Build();
 
         _cacheMock = new Mock<IDistributedCache>();
@@ -36,7 +35,7 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
         _loggerMock = new Mock<ILogger<Api.Services.ContactService>>();
 
         // Setup default behavior for country service mock
-        _countryServiceMock.Setup(x => x.ValidateCountryExistsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        _countryServiceMock.Setup(x => x.ValidateCountryExistsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
     }
 
@@ -91,7 +90,7 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
             Email = "john.doe@example.com",
             Subject = "Test Inquiry",
             Message = "This is a test message",
-            CountryId = 1,
+            CountryId = Guid.Empty,
             ContactType = ContactType.General,
             Priority = Priority.High
         };
@@ -132,7 +131,7 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
             Email = "jane.doe@example.com",
             Subject = "Quotation Request",
             Message = "Please provide a quote",
-            CountryId = 1,
+            CountryId = Guid.Empty,
             ContactType = ContactType.General,
             Files = new List<CreateContactFileRequest>
             {
@@ -192,7 +191,7 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
             Email = "test@example.com",
             Subject = "Test Subject",
             Message = "Test Message",
-            CountryId = 1,
+            CountryId = Guid.Empty,
             ContactType = ContactType.Business,
             Priority = Priority.Medium,
             Status = ContactStatus.New,
@@ -237,7 +236,7 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
                 Email = $"user{i}@example.com",
                 Subject = $"Subject {i}",
                 Message = $"Message {i}",
-                CountryId = 1,
+                CountryId = Guid.Empty,
                 ContactType = i % 2 == 0 ? ContactType.General : ContactType.Business,
                 Priority = Priority.Medium,
                 Status = ContactStatus.New,
@@ -280,7 +279,7 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
             Email = "update@example.com",
             Subject = "Update Subject",
             Message = "Update Message",
-            CountryId = 1,
+            CountryId = Guid.Empty,
             ContactType = ContactType.General,
             Priority = Priority.Medium,
             Status = ContactStatus.New,
@@ -326,7 +325,7 @@ public class ContactServiceIntegrationTests : IAsyncLifetime
             Email = "delete@example.com",
             Subject = "Delete Subject",
             Message = "Delete Message",
-            CountryId = 1,
+            CountryId = Guid.Empty,
             ContactType = ContactType.General,
             Priority = Priority.Medium,
             Status = ContactStatus.New,

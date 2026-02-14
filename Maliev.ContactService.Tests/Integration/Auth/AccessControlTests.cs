@@ -108,7 +108,7 @@ public class AccessControlTests : IClassFixture<CustomWebApplicationFactory<Prog
         Email = $"test.{Guid.NewGuid():N}@example.com",
         Subject = subject,
         Message = "Test message content",
-        CountryId = 1,
+        CountryId = Guid.Empty,
         ContactType = ContactType.General
     };
 }

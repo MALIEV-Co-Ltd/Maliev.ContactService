@@ -39,7 +39,7 @@ public class RateLimitingIntegrationTests : IClassFixture<RateLimitingTestWebApp
                 Email = $"john.doe.{testId}.{i}@example.com",
                 Subject = "Test Subject",
                 Message = "Test Message",
-                CountryId = 1,
+                CountryId = Guid.Empty,
                 ContactType = ContactType.General
             };
             var response = await client.PostAsJsonAsync("/contact/v1/contacts", request);
@@ -53,7 +53,7 @@ public class RateLimitingIntegrationTests : IClassFixture<RateLimitingTestWebApp
             Email = $"john.doe.{testId}.final@example.com",
             Subject = "Test Subject",
             Message = "Test Message",
-            CountryId = 1,
+            CountryId = Guid.Empty,
             ContactType = ContactType.General
         };
         var rateLimitedResponse = await client.PostAsJsonAsync("/contact/v1/contacts", rateLimitRequest);
@@ -78,7 +78,7 @@ public class RateLimitingIntegrationTests : IClassFixture<RateLimitingTestWebApp
                 Email = $"jane.doe.{testId}.{i}@example.com",
                 Subject = "Test Subject",
                 Message = "Test Message",
-                CountryId = 1,
+                CountryId = Guid.Empty,
                 ContactType = ContactType.General
             };
             await client.PostAsJsonAsync("/contact/v1/contacts", request);
@@ -94,7 +94,7 @@ public class RateLimitingIntegrationTests : IClassFixture<RateLimitingTestWebApp
             Email = $"jane.doe.{testId}.final.{Guid.NewGuid():N}@example.com",
             Subject = "Test Subject",
             Message = "Test Message",
-            CountryId = 1,
+            CountryId = Guid.Empty,
             ContactType = ContactType.General
         };
         var response = await client.PostAsJsonAsync("/contact/v1/contacts", finalRequest);

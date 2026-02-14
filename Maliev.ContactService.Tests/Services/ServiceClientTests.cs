@@ -33,7 +33,8 @@ public class ServiceClientTests
     public async Task ValidateCountryExistsAsync_WhenCountryExistsAndIsActive_ReturnsTrue()
     {
         // Arrange
-        var countryDto = new CountryDto { Id = 1, Name = "Test", Iso2 = "TS", IsActive = true };
+        var countryId = Guid.NewGuid();
+        var countryDto = new CountryDto { Id = countryId, Name = "Test", Iso2 = "TS", IsActive = true };
         _handlerMock.Protected()
             .Setup<Task<HttpResponseMessage>>(
                 "SendAsync",
@@ -48,7 +49,7 @@ public class ServiceClientTests
         var client = new CountryServiceClient(_httpClient, _countryLoggerMock.Object);
 
         // Act
-        var result = await client.ValidateCountryExistsAsync(1);
+        var result = await client.ValidateCountryExistsAsync(countryId);
 
         // Assert
         Assert.True(result);
@@ -71,7 +72,7 @@ public class ServiceClientTests
         var client = new CountryServiceClient(_httpClient, _countryLoggerMock.Object);
 
         // Act
-        var result = await client.ValidateCountryExistsAsync(1);
+        var result = await client.ValidateCountryExistsAsync(Guid.NewGuid());
 
         // Assert
         Assert.False(result);
@@ -95,7 +96,7 @@ public class ServiceClientTests
         var client = new CountryServiceClient(_httpClient, _countryLoggerMock.Object);
 
         // Act
-        var result = await client.ValidateCountryExistsAsync(1);
+        var result = await client.ValidateCountryExistsAsync(Guid.NewGuid());
 
         // Assert
         Assert.False(result);
@@ -115,7 +116,7 @@ public class ServiceClientTests
         var client = new CountryServiceClient(_httpClient, _countryLoggerMock.Object);
 
         // Act & Assert
-        await Assert.ThrowsAsync<CountryServiceException>(() => client.ValidateCountryExistsAsync(1));
+        await Assert.ThrowsAsync<CountryServiceException>(() => client.ValidateCountryExistsAsync(Guid.Empty));
     }
 
     [Fact]
@@ -132,7 +133,7 @@ public class ServiceClientTests
         var client = new CountryServiceClient(_httpClient, _countryLoggerMock.Object);
 
         // Act & Assert
-        await Assert.ThrowsAsync<CountryServiceException>(() => client.ValidateCountryExistsAsync(1));
+        await Assert.ThrowsAsync<CountryServiceException>(() => client.ValidateCountryExistsAsync(Guid.Empty));
     }
 
     [Fact]

@@ -34,7 +34,7 @@ public class UpdatedAtPropertyTests : IClassFixture<CustomWebApplicationFactory<
         _countryServiceMock = new Mock<ICountryServiceClient>();
         _loggerMock = new Mock<ILogger<Api.Services.ContactService>>();
 
-        _countryServiceMock.Setup(x => x.ValidateCountryExistsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        _countryServiceMock.Setup(x => x.ValidateCountryExistsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
         _contactService = new Api.Services.ContactService(_context, _cacheMock.Object, _uploadServiceMock.Object, _countryServiceMock.Object, _loggerMock.Object);

@@ -39,7 +39,7 @@ public class PaginationTests : IClassFixture<CustomWebApplicationFactory<Program
         _countryServiceMock = new Mock<ICountryServiceClient>();
         _loggerMock = new Mock<ILogger<Api.Services.ContactService>>();
 
-        _countryServiceMock.Setup(x => x.ValidateCountryExistsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        _countryServiceMock.Setup(x => x.ValidateCountryExistsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
         _contactService = new Api.Services.ContactService(_context, _cacheMock.Object, _uploadServiceMock.Object, _countryServiceMock.Object, _loggerMock.Object);
@@ -65,7 +65,7 @@ public class PaginationTests : IClassFixture<CustomWebApplicationFactory<Program
                 Email = $"user{i}@example.com",
                 Subject = $"Subject {i}",
                 Message = $"Message {i}",
-                CountryId = 1,
+                CountryId = Guid.Empty,
                 ContactType = i % 2 == 0 ? ContactType.General : ContactType.Business,
                 Priority = Priority.Medium,
                 Status = ContactStatus.New,
@@ -101,7 +101,7 @@ public class PaginationTests : IClassFixture<CustomWebApplicationFactory<Program
                 Email = $"user{i}@example.com",
                 Subject = $"Subject {i}",
                 Message = $"Message {i}",
-                CountryId = 1,
+                CountryId = Guid.Empty,
                 ContactType = i % 2 == 0 ? ContactType.General : ContactType.Business,
                 Priority = Priority.Medium,
                 Status = ContactStatus.New,
@@ -137,7 +137,7 @@ public class PaginationTests : IClassFixture<CustomWebApplicationFactory<Program
                 Email = $"user{i}@example.com",
                 Subject = $"Subject {i}",
                 Message = $"Message {i}",
-                CountryId = 1,
+                CountryId = Guid.Empty,
                 ContactType = i % 2 == 0 ? ContactType.General : ContactType.Business,
                 Priority = Priority.Medium,
                 Status = ContactStatus.New,
@@ -171,7 +171,7 @@ public class PaginationTests : IClassFixture<CustomWebApplicationFactory<Program
                 Email = $"user{i}@example.com",
                 Subject = $"Subject {i}",
                 Message = $"Message {i}",
-                CountryId = 1,
+                CountryId = Guid.Empty,
                 ContactType = i % 2 == 0 ? ContactType.General : ContactType.Business,
                 Priority = Priority.Medium,
                 Status = ContactStatus.New,

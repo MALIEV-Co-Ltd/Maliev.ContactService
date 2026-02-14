@@ -18,8 +18,7 @@ public class FileDeletedEventConsumerTests : IAsyncLifetime
 
     public FileDeletedEventConsumerTests()
     {
-        _postgresContainer = new PostgreSqlBuilder()
-            .WithImage("postgres:18-alpine")
+        _postgresContainer = new PostgreSqlBuilder().WithName("postgres:18-alpine")
             .Build();
         _loggerMock = new Mock<ILogger<FileDeletedEventConsumer>>();
     }
@@ -92,7 +91,7 @@ public class FileDeletedEventConsumerTests : IAsyncLifetime
             Email = "test@example.com",
             Subject = "Test Subject",
             Message = "Test Message",
-            CountryId = 1
+            CountryId = Guid.Empty
         };
         dbContext.ContactMessages.Add(messageEntity);
         await dbContext.SaveChangesAsync();

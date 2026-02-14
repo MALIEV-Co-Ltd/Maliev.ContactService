@@ -57,7 +57,7 @@ public class T055_RateLimitingTests : IClassFixture<RateLimitingTestWebApplicati
                 Email = $"{i}.{testEmail}",
                 Subject = "Rate Limit Test",
                 Message = "Testing rate limiting",
-                CountryId = 1,
+                CountryId = Guid.Empty,
                 ContactType = ContactType.General,
                 Priority = Priority.Medium,
                 Files = new List<CreateContactFileRequest>()

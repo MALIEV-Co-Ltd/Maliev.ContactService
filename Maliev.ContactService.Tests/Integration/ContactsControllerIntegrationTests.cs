@@ -58,7 +58,7 @@ public class ContactsControllerIntegrationTests : IClassFixture<CustomWebApplica
             Email = $"john.integration.{Guid.NewGuid():N}@example.com",
             Subject = "Test Subject",
             Message = "Test Message",
-            CountryId = 1,
+            CountryId = Guid.Empty,
             ContactType = ContactType.General
         };
 
@@ -81,7 +81,7 @@ public class ContactsControllerIntegrationTests : IClassFixture<CustomWebApplica
             Email = "invalid-email",
             Subject = "Test Subject",
             Message = "Test Message",
-            CountryId = 1,
+            CountryId = Guid.Empty,
             ContactType = ContactType.General
         };
 
