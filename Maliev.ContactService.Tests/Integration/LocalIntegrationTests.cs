@@ -387,6 +387,11 @@ public class FailingCountryServiceClient : ICountryServiceClient
         return Task.FromException<bool>(
             new CountryServiceException("Country Service is currently unavailable. Please try again in a few moments."));
     }
+
+    public Task<bool> ValidateCountryExistsAsync(int countryId, CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
+    }
 }
 
 /// <summary>

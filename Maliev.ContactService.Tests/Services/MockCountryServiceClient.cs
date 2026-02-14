@@ -9,4 +9,9 @@ public class MockCountryServiceClient : ICountryServiceClient
         // Mock always returns true for any country ID
         return Task.FromResult(true);
     }
+
+    public Task<bool> ValidateCountryExistsAsync(int countryId, CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
+    }
 }
