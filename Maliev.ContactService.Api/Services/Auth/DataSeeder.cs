@@ -5,96 +5,65 @@ using Microsoft.EntityFrameworkCore;
 namespace Maliev.ContactService.Api.Services.Auth;
 
 /// <summary>
-/// Service for seeding authorization data.
+/// Provides seeding functionality for authorization data in the Contact Service.
 /// </summary>
 public static class DataSeeder
 {
-    private static readonly SemaphoreSlim _semaphore = new(1, 1);
-
     /// <summary>
-    /// Seeds permissions and roles into the database.
+    /// Seeds authorization data including permissions and predefined roles.
     /// </summary>
-    public static async Task SeedAuthDataAsync(ContactDbContext dbContext)
+    /// <param name="context">The database context to seed.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    public static async Task SeedAuthDataAsync(ContactDbContext context)
     {
-        await _semaphore.WaitAsync();
-        try
+        // Seed Permissions
+        foreach (var p in ContactPermissions.AllWithDescriptions)
         {
-            // 1. Seed Permissions
-            var allPermissions = ContactPermissions.GetAll().ToList();
-            var existingPermissions = await dbContext.Permissions.AsNoTracking().ToListAsync();
-
-            foreach (var permName in allPermissions)
+            var exists = await context.Permissions.AnyAsync(x => x.Name == p.Key);
+            if (!exists)
             {
-                if (!existingPermissions.Any(p => p.Name == permName))
+                context.Permissions.Add(new Permission
                 {
-                    var category = permName.Split('.')[1];
-                    category = char.ToUpper(category[0]) + category.Substring(1);
+                    Name = p.Key,
+                    Description = p.Value,
+                    Category = p.Key.Split('.')[1]
+                });
+            }
+        }
+        await context.SaveChangesAsync();
 
-                    dbContext.Permissions.Add(new Permission
+        // Seed Roles
+        foreach (var r in ContactPredefinedRoles.All)
+        {
+            var role = await context.Roles
+                .Include(x => x.RolePermissions)
+                .FirstOrDefaultAsync(x => x.Name == r.RoleId);
+
+            if (role == null)
+            {
+                role = new Role
+                {
+                    Name = r.RoleId,
+                    Description = r.Description
+                };
+                context.Roles.Add(role);
+                await context.SaveChangesAsync();
+            }
+
+            // Sync permissions for role
+            foreach (var permName in r.Permissions)
+            {
+                var permission = await context.Permissions.FirstAsync(p => p.Name == permName);
+                if (!role.RolePermissions.Any(rp => rp.PermissionId == permission.Id))
+                {
+                    context.RolePermissions.Add(new RolePermission
                     {
-                        Id = Guid.NewGuid(),
-                        Name = permName,
-                        Category = category,
-                        Description = $"Permission to {permName.Split('.')[2]} {permName.Split('.')[1]}"
+                        RoleId = role.Id,
+                        PermissionId = permission.Id
                     });
                 }
             }
-
-            await dbContext.SaveChangesAsync();
-
-            // 2. Seed Roles
-            var existingRoles = await dbContext.Roles.Include(r => r.RolePermissions).ThenInclude(rp => rp.Permission).ToListAsync();
-            var permissions = await dbContext.Permissions.ToListAsync();
-
-            foreach (var roleDef in ContactPredefinedRoles.All)
-            {
-                var roleName = roleDef.RoleId;
-                var role = existingRoles.FirstOrDefault(r => r.Name == roleName);
-                if (role == null)
-                {
-                    role = new Role
-                    {
-                        Id = Guid.NewGuid(),
-                        Name = roleName,
-                        Description = roleDef.Description
-                    };
-                    dbContext.Roles.Add(role);
-                    await dbContext.SaveChangesAsync();
-                }
-
-                // Sync permissions for the role
-                var rolePermissionNames = roleDef.Permissions;
-
-                // Remove permissions no longer in the role definition
-                var toRemove = role.RolePermissions
-                    .Where(rp => !rolePermissionNames.Contains(rp.Permission.Name))
-                    .ToList();
-
-                foreach (var rp in toRemove)
-                {
-                    role.RolePermissions.Remove(rp);
-                }
-
-                // Add missing permissions
-                foreach (var permName in rolePermissionNames)
-                {
-                    var targetPerm = permissions.First(p => p.Name == permName);
-                    if (!role.RolePermissions.Any(rp => rp.PermissionId == targetPerm.Id))
-                    {
-                        role.RolePermissions.Add(new RolePermission
-                        {
-                            RoleId = role.Id,
-                            PermissionId = targetPerm.Id
-                        });
-                    }
-                }
-            }
-
-            await dbContext.SaveChangesAsync();
         }
-        finally
-        {
-            _semaphore.Release();
-        }
+        await context.SaveChangesAsync();
     }
 }

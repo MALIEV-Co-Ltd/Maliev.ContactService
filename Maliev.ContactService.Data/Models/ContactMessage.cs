@@ -57,7 +57,7 @@ public class ContactMessage : IAuditable
     /// Gets or sets the country identifier associated with the contact message.
     /// </summary>
     [Required]
-    public int CountryId { get; set; }
+    public Guid CountryId { get; set; }
 
     /// <summary>
     /// Gets or sets the type of contact inquiry.

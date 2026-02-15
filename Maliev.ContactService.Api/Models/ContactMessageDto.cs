@@ -38,7 +38,7 @@ public class ContactMessageDto
     /// <summary>
     /// The ID of the country from which the message was sent.
     /// </summary>
-    public int CountryId { get; set; }
+    public Guid CountryId { get; set; }
     /// <summary>
     /// The type of contact (e.g., General Inquiry, Support).
     /// </summary>

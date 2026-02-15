@@ -254,7 +254,7 @@ public class LocalIntegrationTests : IClassFixture<CustomWebApplicationFactory<P
         var contactDto = await response.Content.ReadFromJsonAsync<ContactMessageDto>();
         Assert.NotNull(contactDto);
         Assert.Equal(testEmail, contactDto!.Email);
-        Assert.Equal(Guid.Empty, contactDto.CountryId);
+        Assert.Equal(request.CountryId, contactDto.CountryId);
     }
 
     [Fact]

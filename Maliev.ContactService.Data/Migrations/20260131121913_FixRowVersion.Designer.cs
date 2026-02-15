@@ -12,15 +12,15 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Maliev.ContactService.Data.Migrations
 {
     [DbContext(typeof(ContactDbContext))]
-    [Migration("20260106142056_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260131121913_FixRowVersion")]
+    partial class FixRowVersion
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.1")
+                .HasAnnotation("ProductVersion", "10.0.2")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -158,8 +158,8 @@ namespace Maliev.ContactService.Data.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("contact_type");
 
-                    b.Property<int>("CountryId")
-                        .HasColumnType("integer")
+                    b.Property<Guid>("CountryId")
+                        .HasColumnType("uuid")
                         .HasColumnName("country_id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
@@ -197,6 +197,14 @@ namespace Maliev.ContactService.Data.Migrations
                     b.Property<DateTimeOffset?>("ResolvedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("resolved_at");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("bytea")
+                        .HasColumnName("row_version")
+                        .HasDefaultValueSql("'\\x0000000000000001'::bytea");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer")

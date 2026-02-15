@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using Maliev.Aspire.ServiceDefaults;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.ContactService.Api.Models;
 using Maliev.ContactService.Api.Services;
@@ -43,7 +44,7 @@ public class ContactsController : ControllerBase
     /// <returns>The created contact message</returns>
     [HttpPost]
     [AllowAnonymous]
-    [EnableRateLimiting("ContactPolicy")]
+    [EnableRateLimiting(RateLimitPolicies.Public)]
     public async Task<ActionResult<ContactMessageDto>> CreateContactMessage(CreateContactMessageRequest request)
     {
         // Let ExceptionHandlingMiddleware handle exceptions for proper status codes
@@ -66,7 +67,7 @@ public class ContactsController : ControllerBase
     /// <returns>List of contact messages</returns>
     [HttpGet]
     [RequirePermission(ContactPermissions.Contacts.Read)]
-    [EnableRateLimiting("GlobalPolicy")]
+    [EnableRateLimiting(RateLimitPolicies.Api)]
     public async Task<ActionResult<IEnumerable<ContactMessageDto>>> GetContactMessages(
         [FromQuery] PaginationParameters pagination,
         [FromQuery] ContactStatus? status = null,
@@ -93,7 +94,7 @@ public class ContactsController : ControllerBase
     /// <returns>The contact message</returns>
     [HttpGet("{id}")]
     [RequirePermission(ContactPermissions.Contacts.Read)]
-    [EnableRateLimiting("GlobalPolicy")]
+    [EnableRateLimiting(RateLimitPolicies.Api)]
     public async Task<ActionResult<ContactMessageDto>> GetContactMessage(int id)
     {
         try
@@ -121,7 +122,7 @@ public class ContactsController : ControllerBase
     /// <returns>Updated contact message</returns>
     [HttpPut("{id}/status")]
     [RequirePermission(ContactPermissions.Contacts.Update)]
-    [EnableRateLimiting("GlobalPolicy")]
+    [EnableRateLimiting(RateLimitPolicies.Api)]
     public async Task<ActionResult<ContactMessageDto>> UpdateContactStatus(int id, UpdateContactStatusRequest request)
     {
         try
@@ -142,7 +143,7 @@ public class ContactsController : ControllerBase
     /// <returns>No content if successful</returns>
     [HttpDelete("{id}")]
     [RequirePermission(ContactPermissions.Contacts.Delete)]
-    [EnableRateLimiting("GlobalPolicy")]
+    [EnableRateLimiting(RateLimitPolicies.Api)]
     public async Task<IActionResult> DeleteContactMessage(int id)
     {
         try
@@ -163,7 +164,7 @@ public class ContactsController : ControllerBase
     /// <returns>List of files</returns>
     [HttpGet("{id}/files")]
     [RequirePermission(ContactPermissions.Contacts.Read)]
-    [EnableRateLimiting("GlobalPolicy")]
+    [EnableRateLimiting(RateLimitPolicies.Api)]
     public async Task<ActionResult<IEnumerable<ContactFileDto>>> GetContactFiles(int id)
     {
         try
@@ -190,7 +191,7 @@ public class ContactsController : ControllerBase
     /// <returns>No content if successful</returns>
     [HttpDelete("{id}/files/{fileId}")]
     [RequirePermission(ContactPermissions.Contacts.Delete)]
-    [EnableRateLimiting("GlobalPolicy")]
+    [EnableRateLimiting(RateLimitPolicies.Api)]
     public async Task<IActionResult> DeleteContactFile(int id, int fileId)
     {
         try
@@ -212,7 +213,7 @@ public class ContactsController : ControllerBase
     /// <returns>The file content</returns>
     [HttpGet("{id}/files/{fileId}/download")]
     [RequirePermission(ContactPermissions.Contacts.Read)]
-    [EnableRateLimiting("GlobalPolicy")]
+    [EnableRateLimiting(RateLimitPolicies.Api)]
     public async Task<IActionResult> DownloadContactFile(int id, int fileId)
     {
         try
@@ -245,7 +246,7 @@ public class ContactsController : ControllerBase
     /// <returns>OK if successful</returns>
     [HttpPost("{id}/merge")]
     [RequirePermission(ContactPermissions.Contacts.Merge)]
-    [EnableRateLimiting("GlobalPolicy")]
+    [EnableRateLimiting(RateLimitPolicies.Api)]
     public IActionResult MergeContacts(int id)
     {
         return Ok(new { message = $"Contact {id} merged successfully" });

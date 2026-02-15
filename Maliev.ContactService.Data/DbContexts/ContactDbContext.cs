@@ -20,32 +20,32 @@ public class ContactDbContext : DbContext
     /// <summary>
     /// Gets or sets the DbSet for ContactMessage entities.
     /// </summary>
-    public DbSet<ContactMessage> ContactMessages { get; set; }
+    public DbSet<ContactMessage> ContactMessages => Set<ContactMessage>();
 
     /// <summary>
     /// Gets or sets the DbSet for ContactFile entities.
     /// </summary>
-    public DbSet<ContactFile> ContactFiles { get; set; }
+    public DbSet<ContactFile> ContactFiles => Set<ContactFile>();
 
     /// <summary>
     /// Gets or sets the DbSet for Permission entities.
     /// </summary>
-    public DbSet<Permission> Permissions { get; set; }
+    public DbSet<Permission> Permissions => Set<Permission>();
 
     /// <summary>
     /// Gets or sets the DbSet for Role entities.
     /// </summary>
-    public DbSet<Role> Roles { get; set; }
+    public DbSet<Role> Roles => Set<Role>();
 
     /// <summary>
     /// Gets or sets the DbSet for RolePermission entities.
     /// </summary>
-    public DbSet<RolePermission> RolePermissions { get; set; }
+    public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
 
     /// <summary>
     /// Gets or sets the DbSet for AuditLog entities.
     /// </summary>
-    public DbSet<AuditLog> AuditLogs { get; set; }
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     /// <summary>
     /// Saves all changes made in this context to the database.
@@ -136,6 +136,11 @@ public class ContactDbContext : DbContext
             entity.Property(e => e.Status)
                 .IsRequired()
                 .HasConversion<int>();
+
+            entity.Property(e => e.RowVersion)
+                .IsRowVersion()
+                .HasDefaultValueSql("'\\x0000000000000001'::bytea")
+                .ValueGeneratedOnAddOrUpdate();
 
             entity.Property(e => e.CreatedAt)
                 .IsRequired()

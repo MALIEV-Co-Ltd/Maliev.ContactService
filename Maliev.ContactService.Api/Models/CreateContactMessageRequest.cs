@@ -53,8 +53,7 @@ public class CreateContactMessageRequest : IValidatableObject
     /// Gets or sets the country identifier associated with the contact message.
     /// </summary>
     [Required]
-    [Range(1, 999)]
-    public int CountryId { get; set; }
+    public Guid CountryId { get; set; }
 
     /// <summary>
     /// Gets or sets the type of contact inquiry.

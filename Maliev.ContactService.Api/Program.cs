@@ -5,8 +5,6 @@ using Maliev.ContactService.Api.Services;
 using Maliev.ContactService.Api.Services.Auth;
 using Maliev.ContactService.Data.DbContexts;
 using Maliev.ContactService.Data.Models;
-using System.Threading.RateLimiting;
-
 // Initialize bootstrap logging
 using var loggerFactory = LoggerFactory.Create(logBuilder => logBuilder.AddConsole());
 var bootstrapLogger = loggerFactory.CreateLogger("Program");
@@ -29,7 +27,7 @@ try
     builder.AddServiceMeters("contacts-meter"); // Register service meters
 
     // Add Redis, MassTransit, and PostgreSQL DbContext
-    builder.AddRedisDistributedCache(instanceName: "contact:"); // Redis with in-memory fallback
+    builder.AddStandardCache("contact:"); // Redis + in-memory fallback, memory-optimized // Redis with in-memory fallback
     builder.AddMassTransitWithRabbitMq(x =>
     {
         x.AddConsumer<Maliev.ContactService.Api.Consumers.FileDeletedEventConsumer>();
@@ -37,7 +35,7 @@ try
     builder.AddPostgresDbContext<ContactDbContext>(connectionName: "ContactDbContext"); // PostgreSQL with retry logic
 
     // --- API Configuration ---
-    builder.AddDefaultCors(); // CORS from CORS:AllowedOrigins config
+    builder.AddStandardCors(); // CORS with fail-fast validation
     builder.AddDefaultApiVersioning(); // API versioning with URL segment reader
 
     // JWT Authentication (tests override via PostConfigureAll with dynamic RSA keys)
@@ -67,31 +65,7 @@ try
     });
 
     // Configure Rate Limiting
-    builder.Services.AddRateLimiter(options =>
-    {
-        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-
-        var rateLimitingConfig = builder.Configuration.GetSection("RateLimiting");
-        var fixedWindowOptions = rateLimitingConfig.GetSection("FixedWindow").Get<FixedWindowRateLimiterOptions>();
-        var globalFixedWindowOptions = rateLimitingConfig.GetSection("GlobalFixedWindow").Get<FixedWindowRateLimiterOptions>();
-
-        if (globalFixedWindowOptions != null)
-        {
-            options.AddPolicy("GlobalPolicy", context =>
-                RateLimitPartition.GetFixedWindowLimiter(
-                    partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                    factory: _ => globalFixedWindowOptions));
-        }
-
-        if (fixedWindowOptions != null)
-        {
-            options.AddPolicy("ContactPolicy", context =>
-                RateLimitPartition.GetFixedWindowLimiter(
-                    partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                    factory: _ => fixedWindowOptions));
-        }
-    });
-
+    builder.AddStandardRateLimiting(); // Memory-optimized for low-spec nodes
     // Configure UploadService HTTP client
     builder.AddServiceClient<IUploadServiceClient, UploadServiceClient>("UploadService");
 
@@ -113,14 +87,8 @@ try
     // Run database migrations on startup
     await app.MigrateDatabaseAsync<ContactDbContext>();
 
-    // Seed authorization data
-    using (var scope = app.Services.CreateScope())
-    {
-        var dbContext = scope.ServiceProvider.GetRequiredService<ContactDbContext>();
-        await DataSeeder.SeedAuthDataAsync(dbContext);
-    }
-
     // Configure middleware pipeline
+
     app.UseForwardedHeaders();
     app.UseMiddleware<ExceptionHandlingMiddleware>();
     if (!app.Environment.IsDevelopment())

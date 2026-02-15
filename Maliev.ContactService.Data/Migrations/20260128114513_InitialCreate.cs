@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+﻿using System;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
@@ -41,13 +42,14 @@ namespace Maliev.ContactService.Data.Migrations
                     company = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
                     subject = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
                     message = table.Column<string>(type: "text", nullable: false),
-                    country_id = table.Column<int>(type: "integer", nullable: false),
+                    country_id = table.Column<Guid>(type: "uuid", nullable: false),
                     contact_type = table.Column<int>(type: "integer", nullable: false),
                     priority = table.Column<int>(type: "integer", nullable: false),
                     status = table.Column<int>(type: "integer", nullable: false),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW()"),
                     updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW()"),
-                    resolved_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
+                    resolved_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    row_version = table.Column<byte[]>(type: "bytea", rowVersion: true, nullable: false)
                 },
                 constraints: table =>
                 {

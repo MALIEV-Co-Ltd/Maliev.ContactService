@@ -29,7 +29,7 @@ public class CountryServiceClient : ICountryServiceClient
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>A task representing the asynchronous operation</returns>
 
-    public async Task<bool> ValidateCountryExistsAsync(int countryId, CancellationToken cancellationToken = default)
+    public async Task<bool> ValidateCountryExistsAsync(Guid countryId, CancellationToken cancellationToken = default)
     {
         // Note: Polly retry and circuit breaker policies should be configured in Program.cs when registering
         // the HttpClient. The current implementation uses basic HttpClient timeout (10 seconds) configured

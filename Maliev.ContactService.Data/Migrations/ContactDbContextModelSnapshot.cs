@@ -17,7 +17,7 @@ namespace Maliev.ContactService.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.1")
+                .HasAnnotation("ProductVersion", "10.0.2")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -155,8 +155,8 @@ namespace Maliev.ContactService.Data.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("contact_type");
 
-                    b.Property<int>("CountryId")
-                        .HasColumnType("integer")
+                    b.Property<Guid>("CountryId")
+                        .HasColumnType("uuid")
                         .HasColumnName("country_id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
@@ -200,7 +200,8 @@ namespace Maliev.ContactService.Data.Migrations
                         .IsRequired()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("bytea")
-                        .HasColumnName("row_version");
+                        .HasColumnName("row_version")
+                        .HasDefaultValueSql("'\\x0000000000000001'::bytea");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer")

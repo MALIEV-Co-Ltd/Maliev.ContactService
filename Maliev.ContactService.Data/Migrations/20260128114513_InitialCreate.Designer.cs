@@ -12,15 +12,15 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Maliev.ContactService.Data.Migrations
 {
     [DbContext(typeof(ContactDbContext))]
-    [Migration("20260110145226_AddRowVersion")]
-    partial class AddRowVersion
+    [Migration("20260128114513_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.1")
+                .HasAnnotation("ProductVersion", "10.0.2")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -158,8 +158,8 @@ namespace Maliev.ContactService.Data.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("contact_type");
 
-                    b.Property<int>("CountryId")
-                        .HasColumnType("integer")
+                    b.Property<Guid>("CountryId")
+                        .HasColumnType("uuid")
                         .HasColumnName("country_id");
 
                     b.Property<DateTimeOffset>("CreatedAt")

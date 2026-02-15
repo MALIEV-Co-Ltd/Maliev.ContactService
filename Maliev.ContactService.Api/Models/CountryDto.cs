@@ -8,7 +8,7 @@ public class CountryDto
     /// <summary>
     /// The unique identifier of the country.
     /// </summary>
-    public int Id { get; set; }
+    public Guid Id { get; set; }
     /// <summary>
     /// The name of the country.
     /// </summary>
