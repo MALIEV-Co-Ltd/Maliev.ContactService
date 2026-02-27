@@ -2,7 +2,7 @@ using Maliev.ContactService.Api.Consumers;
 using Maliev.ContactService.Data.DbContexts;
 using Maliev.ContactService.Data.Models;
 using Maliev.MessagingContracts.Contracts.Uploads;
-using Maliev.MessagingContracts.Generated;
+using Maliev.MessagingContracts;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
