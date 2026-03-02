@@ -1,40 +1,22 @@
-using Maliev.ContactService.Api.Services;
+using Maliev.ContactService.Application.Interfaces;
 
 namespace Maliev.ContactService.Tests.Services;
 
 public class MockUploadServiceClient : IUploadServiceClient
 {
-    public Task<UploadResponse> UploadFileAsync(string objectName, byte[] fileContent, string contentType, string fileName)
+    public Task<UploadResponse> UploadFileAsync(string objectName, byte[] content, string contentType, string fileName)
     {
-        return Task.FromResult(new UploadResponse
-        {
-            FileId = "dummy-file-id",
-            ObjectName = objectName,
-            Bucket = "test-bucket",
-            FileSize = fileContent.Length,
-            UploadedAt = DateTime.UtcNow
-        });
+        return Task.FromResult(new UploadResponse("mock-file-id", content.Length));
     }
 
-    public Task<bool> DeleteFileAsync(string uploadServiceFileId)
+    public Task DeleteFileAsync(string fileId)
     {
-        return Task.FromResult(true);
+        return Task.CompletedTask;
     }
 
-    public Task<FileDownloadResponse> DownloadFileAsync(string uploadServiceFileId)
+    public Task<DownloadResponse> DownloadFileAsync(string fileId)
     {
-        var stream = new MemoryStream();
-        var writer = new StreamWriter(stream);
-        writer.Write("This is a test file.");
-        writer.Flush();
-        stream.Position = 0;
-
-        return Task.FromResult(new FileDownloadResponse
-        {
-            Content = stream.ToArray(),
-            ContentType = "text/plain",
-            FileName = "test.txt",
-            FileSize = stream.Length
-        });
+        var content = System.Text.Encoding.UTF8.GetBytes("Mock file content");
+        return Task.FromResult(new DownloadResponse(content, "text/plain", "mock.txt"));
     }
 }

@@ -1,4 +1,4 @@
-using Maliev.ContactService.Data.DbContexts;
+using Maliev.ContactService.Infrastructure.Persistence;
 using Maliev.MessagingContracts.Contracts.Uploads;
 using Maliev.MessagingContracts;
 using MassTransit;

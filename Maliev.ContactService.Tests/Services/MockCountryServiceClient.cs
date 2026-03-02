@@ -1,17 +1,11 @@
-using Maliev.ContactService.Api.Services;
+using Maliev.ContactService.Application.Interfaces;
 
 namespace Maliev.ContactService.Tests.Services;
 
 public class MockCountryServiceClient : ICountryServiceClient
 {
-    public Task<bool> ValidateCountryExistsAsync(Guid countryId, CancellationToken cancellationToken = default)
+    public Task<bool> ValidateCountryExistsAsync(string countryId)
     {
-        // Mock always returns true for any country ID
         return Task.FromResult(true);
-    }
-
-    public Task<bool> ValidateCountryExistsAsync(int countryId, CancellationToken cancellationToken = default)
-    {
-        throw new NotImplementedException();
     }
 }

@@ -1,4 +1,4 @@
-using Maliev.ContactService.Api.Exceptions;
+using Maliev.ContactService.Application.Exceptions;
 using System.Net;
 using System.Text.Json;
 

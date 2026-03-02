@@ -1,10 +1,10 @@
 using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults;
 using Maliev.Aspire.ServiceDefaults.Authorization;
-using Maliev.ContactService.Api.Models;
-using Maliev.ContactService.Api.Services;
-using Maliev.ContactService.Api.Services.Auth;
-using Maliev.ContactService.Data.Models;
+using Maliev.ContactService.Application.DTOs;
+using Maliev.ContactService.Application.Interfaces;
+using Maliev.ContactService.Domain.Constants;
+using Maliev.ContactService.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -130,7 +130,7 @@ public class ContactsController : ControllerBase
             var contact = await _contactService.UpdateContactStatusAsync(id, request);
             return Ok(contact);
         }
-        catch (Maliev.ContactService.Api.Exceptions.NotFoundException)
+        catch (Maliev.ContactService.Application.Exceptions.NotFoundException)
         {
             return NotFound();
         }
@@ -151,7 +151,7 @@ public class ContactsController : ControllerBase
             await _contactService.DeleteContactMessageAsync(id);
             return NoContent();
         }
-        catch (Maliev.ContactService.Api.Exceptions.NotFoundException)
+        catch (Maliev.ContactService.Application.Exceptions.NotFoundException)
         {
             return NotFound();
         }
@@ -172,7 +172,7 @@ public class ContactsController : ControllerBase
             var files = await _contactService.GetContactFilesAsync(id);
             return Ok(files);
         }
-        catch (Maliev.ContactService.Api.Exceptions.NotFoundException)
+        catch (Maliev.ContactService.Application.Exceptions.NotFoundException)
         {
             return NotFound();
         }
@@ -199,7 +199,7 @@ public class ContactsController : ControllerBase
             await _contactService.DeleteContactFileAsync(id, fileId);
             return NoContent();
         }
-        catch (Maliev.ContactService.Api.Exceptions.NotFoundException)
+        catch (Maliev.ContactService.Application.Exceptions.NotFoundException)
         {
             return NotFound();
         }
@@ -228,7 +228,7 @@ public class ContactsController : ControllerBase
             var downloadResponse = await _uploadService.DownloadFileAsync(file.UploadServiceFileId);
             return File(downloadResponse.Content, downloadResponse.ContentType, downloadResponse.FileName);
         }
-        catch (Maliev.ContactService.Api.Exceptions.NotFoundException)
+        catch (Maliev.ContactService.Application.Exceptions.NotFoundException)
         {
             return NotFound();
         }

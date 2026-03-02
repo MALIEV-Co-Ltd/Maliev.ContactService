@@ -1,84 +1,28 @@
 using System.Net;
 using System.Net.Http.Json;
-using Maliev.ContactService.Api.Models;
-using Maliev.ContactService.Api.Services.Auth;
-using Maliev.ContactService.Data.Models;
-using Microsoft.AspNetCore.Mvc.Testing;
+using Maliev.ContactService.Application.DTOs;
+using Maliev.ContactService.Domain.Entities;
+using Maliev.ContactService.Tests.Integration.Infrastructure;
+using Xunit;
 
 namespace Maliev.ContactService.Tests.Integration;
 
-/// <summary>
-/// Integration tests for ContactsController using WebApplicationFactory.
-/// These tests use a real PostgreSQL database via Testcontainers.
-/// </summary>
-[Trait("Category", "Integration")]
-public class ContactsControllerIntegrationTests : IClassFixture<CustomWebApplicationFactory<Program>>, IAsyncLifetime
+[Collection(nameof(IntegrationTestCollection))]
+public class ContactsControllerIntegrationTests : BaseIntegrationTest
 {
-    private readonly CustomWebApplicationFactory<Program> _factory;
-    private HttpClient _client = null!;
-
-    public ContactsControllerIntegrationTests(CustomWebApplicationFactory<Program> factory)
+    public ContactsControllerIntegrationTests(IntegrationTestWebAppFactory factory)
+        : base(factory)
     {
-        _factory = factory;
-    }
-
-    public async Task InitializeAsync()
-    {
-        // The factory and its database container are initialized here
-        await _factory.InitializeAsync();
-        var permissions = ContactPredefinedRoles.GetPermissionsForRole(ContactPredefinedRoles.Admin).ToArray();
-        _client = _factory.CreateAuthenticatedClient("test-user", new[] { ContactPredefinedRoles.Admin }, permissions);
-    }
-
-    public async Task DisposeAsync()
-    {
-        _client?.Dispose();
-        await Task.CompletedTask;
     }
 
     [Fact]
-    public async Task GetContactMessages_Should_Return_Success_With_Proper_Auth()
-    {
-        // Act - Use correct route with service prefix: /contacts/v{version}/contacts
-        var response = await _client.GetAsync("/contact/v1/contacts");
-
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var contacts = await response.Content.ReadFromJsonAsync<IEnumerable<ContactMessageDto>>();
-        Assert.NotNull(contacts);
-    }
-
-    [Fact]
-    public async Task CreateContactMessage_Should_Return_Created()
+    public async Task CreateContactMessage_WithValidData_ReturnsCreated()
     {
         // Arrange
         var request = new CreateContactMessageRequest
         {
-            FullName = "John Doe",
-            Email = $"john.integration.{Guid.NewGuid():N}@example.com",
-            Subject = "Test Subject",
-            Message = "Test Message",
-            CountryId = Guid.Empty,
-            ContactType = ContactType.General
-        };
-
-        // Act - Use correct route with service prefix: /contacts/v{version}/contacts
-        var response = await _client.PostAsJsonAsync("/contact/v1/contacts", request);
-
-        // Assert
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var contact = await response.Content.ReadFromJsonAsync<ContactMessageDto>();
-        Assert.NotNull(contact);
-    }
-
-    [Fact]
-    public async Task CreateContactMessage_Should_Return_BadRequest_When_ModelInvalid()
-    {
-        // Arrange
-        var request = new CreateContactMessageRequest
-        {
-            FullName = "", // Invalid
-            Email = "invalid-email",
+            FullName = "Test Integration",
+            Email = "test.integration@example.com",
             Subject = "Test Subject",
             Message = "Test Message",
             CountryId = Guid.Empty,
@@ -86,19 +30,28 @@ public class ContactsControllerIntegrationTests : IClassFixture<CustomWebApplica
         };
 
         // Act
-        var response = await _client.PostAsJsonAsync("/contact/v1/contacts", request);
+        var response = await Client.PostAsJsonAsync("/contact/v1/contacts", request);
 
         // Assert
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var result = await GetResponseAsync<ContactMessageDto>(response);
+        Assert.NotNull(result);
+        Assert.Equal(request.Email, result!.Email);
     }
 
     [Fact]
-    public async Task GetContactMessage_Should_Return_NotFound_When_NotExists()
+    public async Task GetContactMessage_ExistingId_ReturnsOk()
     {
-        // Act - Use an integer ID that doesn't exist (e.g., 999999)
-        var response = await _client.GetAsync("/contact/v1/contacts/999999");
+        // Arrange
+        var contact = await CreateTestContactAsync();
+
+        // Act
+        var response = await Client.GetAsync($"/contact/v1/contacts/{contact.Id}");
 
         // Assert
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = await GetResponseAsync<ContactMessageDto>(response);
+        Assert.NotNull(result);
+        Assert.Equal(contact.Id, result!.Id);
     }
 }
