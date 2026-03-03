@@ -82,8 +82,18 @@ try
     var app = builder.Build();
     var logger = app.Services.GetRequiredService<ILogger<Program>>();
 
-    // Run database migrations on startup
-    await app.MigrateDatabaseAsync<ContactDbContext>();
+    // Run database migrations on startup (skip in Testing environment for integration tests)
+    var isTestEnvironment = builder.Environment.IsEnvironment("Testing");
+    if (!isTestEnvironment)
+    {
+        await app.MigrateDatabaseAsync<ContactDbContext>();
+    }
+    else
+    {
+        using var scope = app.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ContactDbContext>();
+        await context.Database.EnsureCreatedAsync();
+    }
 
     // Configure middleware pipeline
     app.UseForwardedHeaders();

@@ -42,7 +42,8 @@ public abstract class BaseIntegrationTest
             UpdatedAt = DateTimeOffset.UtcNow,
             Status = ContactStatus.New,
             Priority = Priority.Medium,
-            ContactType = ContactType.General
+            ContactType = ContactType.General,
+            RowVersion = Array.Empty<byte>()
         };
 
         context.ContactMessages.Add(contact);
