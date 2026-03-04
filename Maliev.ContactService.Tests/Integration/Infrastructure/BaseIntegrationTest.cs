@@ -43,7 +43,7 @@ public abstract class BaseIntegrationTest
             Status = ContactStatus.New,
             Priority = Priority.Medium,
             ContactType = ContactType.General,
-            RowVersion = Array.Empty<byte>()
+            RowVersion = 0
         };
 
         context.ContactMessages.Add(contact);

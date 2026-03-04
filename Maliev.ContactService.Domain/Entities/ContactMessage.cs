@@ -95,10 +95,10 @@ public class ContactMessage : IAuditable
     public DateTimeOffset? ResolvedAt { get; set; }
 
     /// <summary>
-    /// Gets or sets the row version for concurrency control.
+    /// Gets or sets the row version for concurrency control (mapped to PostgreSQL xmin).
     /// </summary>
     [Timestamp]
-    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
+    public uint RowVersion { get; set; }
 
     /// <summary>
     /// Gets or sets the collection of files attached to this contact message.

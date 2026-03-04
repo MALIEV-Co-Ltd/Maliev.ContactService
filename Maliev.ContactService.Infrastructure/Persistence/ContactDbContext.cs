@@ -1,6 +1,7 @@
 using Maliev.ContactService.Application.Interfaces;
 using Maliev.ContactService.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace Maliev.ContactService.Infrastructure.Persistence;
@@ -54,6 +55,25 @@ public class ContactDbContext : DbContext, IContactDbContext
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        AddTimestamps();
         return base.SaveChangesAsync(cancellationToken);
+    }
+
+    private void AddTimestamps()
+    {
+        var entities = ChangeTracker.Entries<IAuditable>()
+            .Where(x => x.State == EntityState.Added || x.State == EntityState.Modified);
+
+        foreach (var entity in entities)
+        {
+            var now = DateTimeOffset.UtcNow;
+
+            if (entity.State == EntityState.Added)
+            {
+                entity.Entity.CreatedAt = now;
+            }
+
+            entity.Entity.UpdatedAt = now;
+        }
     }
 }

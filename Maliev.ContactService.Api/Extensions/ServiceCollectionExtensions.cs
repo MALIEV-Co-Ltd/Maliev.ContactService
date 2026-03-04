@@ -24,15 +24,19 @@ public static class ServiceCollectionExtensions
         var jwtAudience = configuration["Jwt:Audience"] ?? throw new InvalidOperationException("Jwt:Audience not found");
 
         // Parse RSA public key
-        var rsa = System.Security.Cryptography.RSA.Create();
-        try
+        System.Security.Cryptography.RSAParameters rsaParameters;
+        using (var rsa = System.Security.Cryptography.RSA.Create())
         {
-            var publicKeyPem = Encoding.UTF8.GetString(Convert.FromBase64String(jwtPublicKey));
-            rsa.ImportFromPem(publicKeyPem);
-        }
-        catch (Exception ex)
-        {
-            throw new InvalidOperationException("Invalid JWT public key format", ex);
+            try
+            {
+                var publicKeyPem = Encoding.UTF8.GetString(Convert.FromBase64String(jwtPublicKey));
+                rsa.ImportFromPem(publicKeyPem);
+                rsaParameters = rsa.ExportParameters(false);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException("Invalid JWT public key format", ex);
+            }
         }
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -45,7 +49,7 @@ public static class ServiceCollectionExtensions
                     ValidateAudience = true,
                     ValidAudience = jwtAudience,
                     ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = new RsaSecurityKey(rsa),
+                    IssuerSigningKey = new RsaSecurityKey(rsaParameters),
                     ValidateLifetime = true,
                     ClockSkew = TimeSpan.FromMinutes(5)
                 };

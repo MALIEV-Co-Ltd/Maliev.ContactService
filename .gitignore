@@ -85,3 +85,5 @@ nunit-*.xml
 appsettings.Development.json
 docker-compose*.yml
 docker-compose.override.yml
+code-coverage/
+coverage/

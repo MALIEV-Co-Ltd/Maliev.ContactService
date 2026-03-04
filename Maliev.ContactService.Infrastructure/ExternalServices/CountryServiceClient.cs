@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using Maliev.ContactService.Application.Exceptions;
 using Maliev.ContactService.Application.Interfaces;
 
 namespace Maliev.ContactService.Infrastructure.ExternalServices;
@@ -22,11 +23,23 @@ public class CountryServiceClient : ICountryServiceClient
                 var result = await response.Content.ReadFromJsonAsync<ValidationResult>();
                 return result?.IsValid ?? false;
             }
-            return false;
+
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return false;
+            }
+
+            throw new CountryServiceException(
+                "Unable to validate country information. Please try again in a few moments.");
         }
-        catch
+        catch (CountryServiceException)
         {
-            return false;
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw new CountryServiceException(
+                "Unable to validate country information. Please try again in a few moments.", ex);
         }
     }
 
