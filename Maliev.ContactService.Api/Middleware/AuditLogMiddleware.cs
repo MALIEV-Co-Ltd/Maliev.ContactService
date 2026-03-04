@@ -1,4 +1,5 @@
-using Maliev.ContactService.Api.Services.Auth;
+using Maliev.ContactService.Domain.Constants;
+using Maliev.ContactService.Application.Interfaces;
 using System.Security.Claims;
 
 namespace Maliev.ContactService.Api.Middleware;
