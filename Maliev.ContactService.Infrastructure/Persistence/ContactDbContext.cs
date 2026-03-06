@@ -3,6 +3,7 @@ using Maliev.ContactService.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace Maliev.ContactService.Infrastructure.Persistence;
 
@@ -29,6 +30,10 @@ public class ContactDbContext : DbContext, IContactDbContext
         {
             entity.ToTable("ContactMessages");
             entity.HasKey(e => e.Id);
+            entity.Property(e => e.Xmin)
+                .HasColumnType("xid")
+                .IsConcurrencyToken();
+            entity.HasIndex(e => e.Email);
             entity.HasMany(e => e.Files)
                   .WithOne(e => e.ContactMessage)
                   .HasForeignKey(e => e.ContactMessageId)
@@ -50,6 +55,18 @@ public class ContactDbContext : DbContext, IContactDbContext
         modelBuilder.Entity<RolePermission>(entity =>
         {
             entity.HasKey(rp => new { rp.RoleId, rp.PermissionId });
+        });
+
+        modelBuilder.Entity<Permission>(entity =>
+        {
+            entity.ToTable("Permissions");
+            entity.HasKey(e => e.Id);
+        });
+
+        modelBuilder.Entity<Role>(entity =>
+        {
+            entity.ToTable("Roles");
+            entity.HasKey(e => e.Id);
         });
     }
 

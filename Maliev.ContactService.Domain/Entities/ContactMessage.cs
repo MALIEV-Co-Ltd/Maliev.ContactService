@@ -14,6 +14,11 @@ public class ContactMessage : IAuditable
     public int Id { get; set; }
 
     /// <summary>
+    /// Gets or sets the xmin for optimistic concurrency.
+    /// </summary>
+    public uint Xmin { get; set; }
+
+    /// <summary>
     /// Gets or sets the full name of the person submitting the contact message.
     /// </summary>
     [Required]
@@ -93,12 +98,6 @@ public class ContactMessage : IAuditable
     /// Gets or sets the timestamp when the contact message was resolved.
     /// </summary>
     public DateTimeOffset? ResolvedAt { get; set; }
-
-    /// <summary>
-    /// Gets or sets the row version for concurrency control (mapped to PostgreSQL xmin).
-    /// </summary>
-    [Timestamp]
-    public uint RowVersion { get; set; }
 
     /// <summary>
     /// Gets or sets the collection of files attached to this contact message.

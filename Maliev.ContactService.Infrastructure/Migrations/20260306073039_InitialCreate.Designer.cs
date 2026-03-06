@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Maliev.ContactService.Infrastructure.Migrations
 {
     [DbContext(typeof(ContactDbContext))]
-    [Migration("20260304110836_InitialCreate")]
+    [Migration("20260306073039_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -155,12 +155,6 @@ namespace Maliev.ContactService.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("ResolvedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<uint>("RowVersion")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
@@ -172,7 +166,13 @@ namespace Maliev.ContactService.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<uint>("Xmin")
+                        .IsConcurrencyToken()
+                        .HasColumnType("xid");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("Email");
 
                     b.ToTable("ContactMessages", (string)null);
                 });
@@ -199,7 +199,7 @@ namespace Maliev.ContactService.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Permissions");
+                    b.ToTable("Permissions", (string)null);
                 });
 
             modelBuilder.Entity("Maliev.ContactService.Domain.Entities.Role", b =>
@@ -219,7 +219,7 @@ namespace Maliev.ContactService.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Roles");
+                    b.ToTable("Roles", (string)null);
                 });
 
             modelBuilder.Entity("Maliev.ContactService.Domain.Entities.RolePermission", b =>

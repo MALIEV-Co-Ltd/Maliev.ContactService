@@ -118,7 +118,7 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
                 ");
 
                 // Create tables matching the migration exactly - use raw SQL to avoid EF Core model caching issues
-                // This creates the schema exactly as the migration would, including the row_version column
+                // This creates the schema exactly as the migration would, including the xmin column
                 context.Database.ExecuteSqlRaw(@"
                     CREATE TABLE ""AuditLogs"" (
                         ""Id"" uuid NOT NULL,
@@ -162,6 +162,7 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
                         ""CreatedAt"" timestamp with time zone NOT NULL,
                         ""UpdatedAt"" timestamp with time zone NOT NULL,
                         ""ResolvedAt"" timestamp with time zone,
+                        ""Xmin"" xid NOT NULL,
                         CONSTRAINT ""PK_ContactMessages"" PRIMARY KEY (""Id"")
                     );
 
@@ -192,6 +193,7 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
 
                     CREATE INDEX ""IX_ContactFiles_ContactMessageId"" ON ""ContactFiles"" (""ContactMessageId"");
                     CREATE INDEX ""IX_RolePermissions_PermissionId"" ON ""RolePermissions"" (""PermissionId"");
+                    CREATE INDEX ""IX_ContactMessages_Email"" ON ""ContactMessages"" (""Email"");
                 ");
             }
 

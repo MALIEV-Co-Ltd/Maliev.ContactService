@@ -77,6 +77,8 @@ This document provides essential information for AI agents and developers workin
 - **Entity Framework:**
   - Use `AsNoTracking()` for read-only queries to improve performance.
   - Use `Async` methods for all database operations (`ToListAsync`, `FirstOrDefaultAsync`).
+  - **`Microsoft.EntityFrameworkCore.Design` package is PROHIBITED in Api project.** It must only be used in the Infrastructure project where migrations are located. Adding this package to Api will break the build.
+  - When creating migrations, set the startup project to the Infrastructure project to correctly generate migrations (e.g., `dotnet ef migrations add --startup-project ../Maliev.ContactService.Infrastructure`).
 
 ### Error Handling
 - Use custom exceptions for domain errors (e.g., `NotFoundException`).

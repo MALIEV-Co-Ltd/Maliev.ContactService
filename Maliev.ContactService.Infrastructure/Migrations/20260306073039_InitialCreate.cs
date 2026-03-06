@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+﻿using System;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
@@ -35,6 +36,7 @@ namespace Maliev.ContactService.Infrastructure.Migrations
                 {
                     Id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    Xmin = table.Column<uint>(type: "xid", nullable: false),
                     FullName = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     Email = table.Column<string>(type: "character varying(254)", maxLength: 254, nullable: false),
                     PhoneNumber = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
@@ -135,6 +137,11 @@ namespace Maliev.ContactService.Infrastructure.Migrations
                 name: "IX_ContactFiles_ContactMessageId",
                 table: "ContactFiles",
                 column: "ContactMessageId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ContactMessages_Email",
+                table: "ContactMessages",
+                column: "Email");
 
             migrationBuilder.CreateIndex(
                 name: "IX_RolePermissions_PermissionId",
