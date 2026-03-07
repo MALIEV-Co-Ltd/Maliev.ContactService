@@ -30,9 +30,8 @@ public class ContactDbContext : DbContext, IContactDbContext
         {
             entity.ToTable("ContactMessages");
             entity.HasKey(e => e.Id);
-            entity.Property(e => e.Xmin)
-                .HasColumnType("xid")
-                .IsConcurrencyToken();
+            entity.Property<uint>("Xmin")
+                .HasColumnType("xid");
             entity.HasIndex(e => e.Email);
             entity.HasMany(e => e.Files)
                   .WithOne(e => e.ContactMessage)

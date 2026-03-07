@@ -14,11 +14,6 @@ public class ContactMessage : IAuditable
     public int Id { get; set; }
 
     /// <summary>
-    /// Gets or sets the xmin for optimistic concurrency.
-    /// </summary>
-    public uint Xmin { get; set; }
-
-    /// <summary>
     /// Gets or sets the full name of the person submitting the contact message.
     /// </summary>
     [Required]

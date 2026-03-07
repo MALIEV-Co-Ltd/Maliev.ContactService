@@ -162,7 +162,7 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
                         ""CreatedAt"" timestamp with time zone NOT NULL,
                         ""UpdatedAt"" timestamp with time zone NOT NULL,
                         ""ResolvedAt"" timestamp with time zone,
-                        ""Xmin"" xid NOT NULL,
+                        ""Xmin"" xid NULL,
                         CONSTRAINT ""PK_ContactMessages"" PRIMARY KEY (""Id"")
                     );
 
