@@ -78,7 +78,7 @@ This document provides essential information for AI agents and developers workin
   - Use `AsNoTracking()` for read-only queries to improve performance.
   - Use `Async` methods for all database operations (`ToListAsync`, `FirstOrDefaultAsync`).
   - **`Microsoft.EntityFrameworkCore.Design` package is PROHIBITED in Api project.** It must only be used in the Infrastructure project where migrations are located. Adding this package to Api will break the build.
-  - When creating migrations, set the startup project to the Infrastructure project to correctly generate migrations (e.g., `dotnet ef migrations add --startup-project ../Maliev.ContactService.Infrastructure`).
+  - When creating migrations: `dotnet ef migrations add <Name> --project Maliev.ContactService.Infrastructure --startup-project Maliev.ContactService.Api`
 
 ### Error Handling
 - Use custom exceptions for domain errors (e.g., `NotFoundException`).
@@ -129,3 +129,23 @@ public async Task GetContactMessage_Should_Return_Contact_When_Exists()
 - **Proactiveness:** Always verify changes with a successful build.
 - **Assumptions:** Never assume changes will not break the build.
 - **Context:** Read surrounding code to understand existing patterns before modifying.
+
+
+## Database & EF Core — Mandatory Rules
+
+### EF Core Design Package
+- ❌ `Microsoft.EntityFrameworkCore.Design` MUST NOT be in Api projects
+- ✅ It belongs ONLY in the Infrastructure (or Data) project where migrations live
+- Migration commands must target Infrastructure, not Api:
+  ```
+  dotnet ef migrations add <Name> --project Maliev.<Domain>Service.Infrastructure --startup-project ../Maliev.<Domain>Service.Api
+  ```
+
+### PostgreSQL xmin Concurrency — Mandatory Pattern
+Use shadow property ONLY. Never add a Xmin/xmin property to domain entities.
+```csharp
+entity.Property<uint>("xmin").HasColumnType("xid").IsRowVersion();
+```
+- ❌ Never use `UseXminAsConcurrencyToken()` (removed in Npgsql EF v7)
+- ❌ Never use entity property `public uint Xmin { get; set; }` or `public uint xmin { get; set; }`
+- ❌ Never use `.Ignore(e => e.Xmin)` — remove the entity property instead
