@@ -29,7 +29,9 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
     {
         Environment.SetEnvironmentVariable("CORS_ALLOWED_ORIGINS", "https://localhost:5001");
 
-        _postgresContainer = new PostgreSqlBuilder()
+        _postgresContainer = 
+                #pragma warning disable CS0618
+        new PostgreSqlBuilder()
             .WithImage("postgres:16-alpine")
             .WithDatabase("contact_test")
             .WithUsername("testuser")
@@ -92,6 +94,7 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
                 ["CORS:AllowedOrigins:0"] = "https://localhost:5001"
             })
             .Build();
+#pragma warning restore CS0618
 
         builder.UseConfiguration(config);
 
@@ -223,3 +226,6 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
 public class IntegrationTestCollection : ICollectionFixture<IntegrationTestWebAppFactory>
 {
 }
+
+
+
