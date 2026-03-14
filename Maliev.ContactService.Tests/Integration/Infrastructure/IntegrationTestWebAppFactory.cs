@@ -29,7 +29,7 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
     {
         Environment.SetEnvironmentVariable("CORS_ALLOWED_ORIGINS", "https://localhost:5001");
 
-        _postgresContainer = 
+        _postgresContainer =
 #pragma warning disable CS0618
         new PostgreSqlBuilder()
             .WithImage("postgres:16-alpine")
@@ -45,14 +45,6 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
         _redisContainer = new RedisBuilder()
             .WithImage("redis:7-alpine")
             .Build();
-
-        _postgresContainer.StartAsync().GetAwaiter().GetResult();
-        _rabbitMqContainer.StartAsync().GetAwaiter().GetResult();
-        _redisContainer.StartAsync().GetAwaiter().GetResult();
-
-        _connectionString = _postgresContainer.GetConnectionString();
-        _rabbitMqConnectionString = _rabbitMqContainer.GetConnectionString();
-        _redisConnectionString = _redisContainer.GetConnectionString();
     }
 
     public string ConnectionString => _connectionString
@@ -64,9 +56,15 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
     public string RedisConnectionString => _redisConnectionString
         ?? throw new InvalidOperationException("Redis connection string not initialized");
 
-    public Task InitializeAsync()
+    public async Task InitializeAsync()
     {
-        return Task.CompletedTask;
+        await _postgresContainer.StartAsync();
+        await _rabbitMqContainer.StartAsync();
+        await _redisContainer.StartAsync();
+
+        _connectionString = _postgresContainer.GetConnectionString();
+        _rabbitMqConnectionString = _rabbitMqContainer.GetConnectionString();
+        _redisConnectionString = _redisContainer.GetConnectionString();
     }
 
     Task IAsyncLifetime.DisposeAsync()
@@ -226,6 +224,5 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
 public class IntegrationTestCollection : ICollectionFixture<IntegrationTestWebAppFactory>
 {
 }
-
 
 
