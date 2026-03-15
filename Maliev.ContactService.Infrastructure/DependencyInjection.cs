@@ -4,7 +4,6 @@ using Maliev.ContactService.Infrastructure.BackgroundServices;
 using Maliev.ContactService.Infrastructure.ExternalServices;
 using Maliev.ContactService.Infrastructure.Metrics;
 using Maliev.ContactService.Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -14,9 +13,6 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddDbContext<ContactDbContext>(options =>
-            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
-
         services.AddScoped<IContactDbContext>(provider => provider.GetRequiredService<ContactDbContext>());
 
         // Background Services
