@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Maliev.ContactService.Infrastructure.Migrations
 {
     [DbContext(typeof(ContactDbContext))]
-    [Migration("20260306073039_InitialCreate")]
+    [Migration("20260325113531_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -20,7 +20,7 @@ namespace Maliev.ContactService.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.3")
+                .HasAnnotation("ProductVersion", "10.0.5")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -167,7 +167,6 @@ namespace Maliev.ContactService.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<uint>("Xmin")
-                        .IsConcurrencyToken()
                         .HasColumnType("xid");
 
                     b.HasKey("Id");
@@ -175,66 +174,6 @@ namespace Maliev.ContactService.Infrastructure.Migrations
                     b.HasIndex("Email");
 
                     b.ToTable("ContactMessages", (string)null);
-                });
-
-            modelBuilder.Entity("Maliev.ContactService.Domain.Entities.Permission", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Permissions", (string)null);
-                });
-
-            modelBuilder.Entity("Maliev.ContactService.Domain.Entities.Role", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Roles", (string)null);
-                });
-
-            modelBuilder.Entity("Maliev.ContactService.Domain.Entities.RolePermission", b =>
-                {
-                    b.Property<Guid>("RoleId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("PermissionId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("RoleId", "PermissionId");
-
-                    b.HasIndex("PermissionId");
-
-                    b.ToTable("RolePermissions");
                 });
 
             modelBuilder.Entity("Maliev.ContactService.Domain.Entities.ContactFile", b =>
@@ -248,38 +187,9 @@ namespace Maliev.ContactService.Infrastructure.Migrations
                     b.Navigation("ContactMessage");
                 });
 
-            modelBuilder.Entity("Maliev.ContactService.Domain.Entities.RolePermission", b =>
-                {
-                    b.HasOne("Maliev.ContactService.Domain.Entities.Permission", "Permission")
-                        .WithMany("RolePermissions")
-                        .HasForeignKey("PermissionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Maliev.ContactService.Domain.Entities.Role", "Role")
-                        .WithMany("RolePermissions")
-                        .HasForeignKey("RoleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Permission");
-
-                    b.Navigation("Role");
-                });
-
             modelBuilder.Entity("Maliev.ContactService.Domain.Entities.ContactMessage", b =>
                 {
                     b.Navigation("Files");
-                });
-
-            modelBuilder.Entity("Maliev.ContactService.Domain.Entities.Permission", b =>
-                {
-                    b.Navigation("RolePermissions");
-                });
-
-            modelBuilder.Entity("Maliev.ContactService.Domain.Entities.Role", b =>
-                {
-                    b.Navigation("RolePermissions");
                 });
 #pragma warning restore 612, 618
         }

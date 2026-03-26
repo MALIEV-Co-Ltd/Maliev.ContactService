@@ -16,10 +16,6 @@ public class ContactDbContext : DbContext, IContactDbContext
     public DbSet<ContactMessage> ContactMessages => Set<ContactMessage>();
     public DbSet<ContactFile> ContactFiles => Set<ContactFile>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
-    public DbSet<Permission> Permissions => Set<Permission>();
-    public DbSet<Role> Roles => Set<Role>();
-    public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
-
     DatabaseFacade IContactDbContext.Database => base.Database;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -51,22 +47,6 @@ public class ContactDbContext : DbContext, IContactDbContext
             entity.HasKey(e => e.Id);
         });
 
-        modelBuilder.Entity<RolePermission>(entity =>
-        {
-            entity.HasKey(rp => new { rp.RoleId, rp.PermissionId });
-        });
-
-        modelBuilder.Entity<Permission>(entity =>
-        {
-            entity.ToTable("Permissions");
-            entity.HasKey(e => e.Id);
-        });
-
-        modelBuilder.Entity<Role>(entity =>
-        {
-            entity.ToTable("Roles");
-            entity.HasKey(e => e.Id);
-        });
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

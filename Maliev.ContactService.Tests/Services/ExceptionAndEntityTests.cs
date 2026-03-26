@@ -197,32 +197,4 @@ public class EntityTests
 
         Assert.NotEqual(default, auditLog.Timestamp);
     }
-
-    [Fact]
-    public void Permission_Properties_CanBeSet()
-    {
-        var permission = new Permission
-        {
-            Name = "test.permission",
-            Description = "Test permission",
-            Category = "TestCategory"
-        };
-
-        Assert.Equal("test.permission", permission.Name);
-        Assert.Equal("Test permission", permission.Description);
-        Assert.Equal("TestCategory", permission.Category);
-    }
-
-    [Fact]
-    public void Role_Properties_CanBeSet()
-    {
-        var role = new Role
-        {
-            Name = "test.role",
-            Description = "Test role"
-        };
-
-        Assert.Equal("test.role", role.Name);
-        Assert.Equal("Test role", role.Description);
-    }
 }
