@@ -20,6 +20,8 @@ bld/
 *.swp
 *.swo
 *.user
+*.rsuser
+*.DotSettings.user
 *.suo
 *.csproj.user
 *.sln.docstates
