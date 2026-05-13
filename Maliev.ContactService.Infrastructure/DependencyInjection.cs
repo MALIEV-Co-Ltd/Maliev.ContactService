@@ -1,4 +1,5 @@
 using Maliev.Aspire.ServiceDefaults.Authorization;
+using Maliev.Aspire.ServiceDefaults.IAM;
 using Maliev.ContactService.Application.Interfaces;
 using Maliev.ContactService.Infrastructure.BackgroundServices;
 using Maliev.ContactService.Infrastructure.ExternalServices;
@@ -29,7 +30,8 @@ public static class DependencyInjection
                 ?? configuration["Services:UploadService:BaseUrl"]
                 ?? "https+http://UploadService");
         })
-        .AddServiceDiscovery();
+        .AddServiceDiscovery()
+        .AddHttpMessageHandler<ServiceAccountAuthenticationHandler>();
 
         services.AddHttpClient<ICountryServiceClient, CountryServiceClient>(client =>
         {
@@ -38,7 +40,8 @@ public static class DependencyInjection
                 ?? configuration["Services:CountryService:BaseUrl"]
                 ?? "https+http://CountryService");
         })
-        .AddServiceDiscovery();
+        .AddServiceDiscovery()
+        .AddHttpMessageHandler<ServiceAccountAuthenticationHandler>();
 
         return services;
     }

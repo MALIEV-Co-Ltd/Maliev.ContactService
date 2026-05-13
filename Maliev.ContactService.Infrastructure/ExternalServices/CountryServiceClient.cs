@@ -17,11 +17,11 @@ public class CountryServiceClient : ICountryServiceClient
     {
         try
         {
-            var response = await _httpClient.GetAsync($"/v1/countries/{countryId}/validate");
+            var response = await _httpClient.GetAsync($"/country/v1/countries/{countryId}");
             if (response.IsSuccessStatusCode)
             {
-                var result = await response.Content.ReadFromJsonAsync<ValidationResult>();
-                return result?.IsValid ?? false;
+                var result = await response.Content.ReadFromJsonAsync<CountryValidationResponse>();
+                return result?.IsActive ?? false;
             }
 
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -43,5 +43,5 @@ public class CountryServiceClient : ICountryServiceClient
         }
     }
 
-    private record ValidationResult(bool IsValid);
+    private record CountryValidationResponse(bool IsActive);
 }
