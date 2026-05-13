@@ -24,13 +24,21 @@ public static class DependencyInjection
         // External Service Clients
         services.AddHttpClient<IUploadServiceClient, UploadServiceClient>(client =>
         {
-            client.BaseAddress = new Uri(configuration["ExternalServices:UploadService"] ?? "http://upload-service");
-        });
+            client.BaseAddress = new Uri(
+                configuration["ExternalServices:UploadService"]
+                ?? configuration["Services:UploadService:BaseUrl"]
+                ?? "https+http://UploadService");
+        })
+        .AddServiceDiscovery();
 
         services.AddHttpClient<ICountryServiceClient, CountryServiceClient>(client =>
         {
-            client.BaseAddress = new Uri(configuration["ExternalServices:CountryService"] ?? "http://country-service");
-        });
+            client.BaseAddress = new Uri(
+                configuration["ExternalServices:CountryService"]
+                ?? configuration["Services:CountryService:BaseUrl"]
+                ?? "https+http://CountryService");
+        })
+        .AddServiceDiscovery();
 
         return services;
     }
