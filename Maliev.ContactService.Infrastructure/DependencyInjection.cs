@@ -29,6 +29,7 @@ public static class DependencyInjection
                 configuration["ExternalServices:UploadService"]
                 ?? configuration["Services:UploadService:BaseUrl"]
                 ?? "https+http://UploadService");
+            client.Timeout = TimeSpan.FromSeconds(5);
         })
         .AddServiceDiscovery()
         .AddHttpMessageHandler<ServiceAccountAuthenticationHandler>();

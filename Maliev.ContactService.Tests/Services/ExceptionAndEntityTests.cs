@@ -149,6 +149,24 @@ public class InfrastructureServiceTests
         Assert.Equal("application/octet-stream", response.ContentType);
         Assert.Equal("default.bin", response.FileName);
     }
+
+    [Fact]
+    public void DependencyInjection_UploadServiceHttpClient_UsesShortTimeout()
+    {
+        var sourcePath = Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "..",
+            "..",
+            "..",
+            "Maliev.ContactService.Infrastructure",
+            "DependencyInjection.cs"));
+
+        Assert.True(File.Exists(sourcePath), $"Could not find source file: {sourcePath}");
+        var source = File.ReadAllText(sourcePath);
+
+        Assert.Contains("client.Timeout = TimeSpan.FromSeconds(5);", source, StringComparison.Ordinal);
+    }
 }
 
 public class EntityTests
