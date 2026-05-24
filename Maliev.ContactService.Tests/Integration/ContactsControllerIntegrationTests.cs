@@ -4,6 +4,7 @@ using Maliev.ContactService.Application.DTOs;
 using Maliev.ContactService.Domain.Entities;
 using Maliev.ContactService.Infrastructure.Persistence;
 using Maliev.ContactService.Tests.Integration.Infrastructure;
+using Maliev.ContactService.Tests.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -21,6 +22,8 @@ public class ContactsControllerIntegrationTests : BaseIntegrationTest
     public async Task CreateContactMessage_WithValidData_ReturnsCreated()
     {
         // Arrange
+        var notificationPublisher = Factory.Services.GetRequiredService<CapturingContactNotificationPublisher>();
+        notificationPublisher.Reset();
         var request = new CreateContactMessageRequest
         {
             FullName = "Test Integration",
@@ -39,6 +42,11 @@ public class ContactsControllerIntegrationTests : BaseIntegrationTest
         var result = await GetResponseAsync<ContactMessageDto>(response);
         Assert.NotNull(result);
         Assert.Equal(request.Email, result!.Email);
+
+        var publishedMessage = Assert.Single(notificationPublisher.PublishedMessages);
+        Assert.Equal(result.Id, publishedMessage.Id);
+        Assert.Equal(request.Email, publishedMessage.Email);
+        Assert.Equal(request.Subject, publishedMessage.Subject);
     }
 
     [Fact]

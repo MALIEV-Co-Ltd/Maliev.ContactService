@@ -20,6 +20,7 @@ public class ContactService : IContactService
     private readonly IDistributedCache _cache;
     private readonly IUploadServiceClient _uploadService;
     private readonly ICountryServiceClient _countryService;
+    private readonly IContactNotificationPublisher _notificationPublisher;
     private readonly ILogger<ContactService> _logger;
     private static readonly DistributedCacheEntryOptions CacheOptions = new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5) };
     private const string ListCacheVersionKey = "contact-list-version";
@@ -31,18 +32,21 @@ public class ContactService : IContactService
     /// <param name="cache">The distributed cache instance.</param>
     /// <param name="uploadService">The upload service client.</param>
     /// <param name="countryService">The country service client.</param>
+    /// <param name="notificationPublisher">The notification publisher.</param>
     /// <param name="logger">The logger instance.</param>
     public ContactService(
         IContactDbContext context,
         IDistributedCache cache,
         IUploadServiceClient uploadService,
         ICountryServiceClient countryService,
+        IContactNotificationPublisher notificationPublisher,
         ILogger<ContactService> logger)
     {
         _context = context;
         _cache = cache;
         _uploadService = uploadService;
         _countryService = countryService;
+        _notificationPublisher = notificationPublisher;
         _logger = logger;
     }
 
@@ -144,6 +148,7 @@ public class ContactService : IContactService
         });
 
         await InvalidateListCacheAsync();
+        await _notificationPublisher.PublishContactMessageSubmittedAsync(createdMessage);
         return createdMessage;
     }
 

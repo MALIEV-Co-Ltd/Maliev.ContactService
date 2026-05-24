@@ -55,6 +55,7 @@ try
     // --- Layer Registration ---
     builder.Services.AddApplication();
     builder.Services.AddInfrastructure(builder.Configuration);
+    builder.Services.AddScoped<IContactNotificationPublisher, MassTransitContactNotificationPublisher>();
 
     // Add OpenAPI (must be in Program.cs for XML comments to work via source generator)
     if (!builder.Environment.IsProduction())

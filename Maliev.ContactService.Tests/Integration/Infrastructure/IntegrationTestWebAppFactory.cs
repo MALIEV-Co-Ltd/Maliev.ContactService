@@ -205,6 +205,9 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
 
             services.AddScoped<IUploadServiceClient, MockUploadServiceClient>();
             services.AddScoped<ICountryServiceClient, MockCountryServiceClient>();
+            services.AddSingleton<CapturingContactNotificationPublisher>();
+            services.AddScoped<IContactNotificationPublisher>(
+                provider => provider.GetRequiredService<CapturingContactNotificationPublisher>());
 
             services.AddAuthentication(TestAuthHandler.AuthenticationScheme)
                 .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(
@@ -224,5 +227,4 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
 public class IntegrationTestCollection : ICollectionFixture<IntegrationTestWebAppFactory>
 {
 }
-
 
