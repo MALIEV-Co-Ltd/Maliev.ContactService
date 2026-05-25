@@ -4,8 +4,15 @@ namespace Maliev.ContactService.Tests.Services;
 
 public class MockUploadServiceClient : IUploadServiceClient
 {
+    public static bool ThrowOnUpload { get; set; }
+
     public Task<UploadResponse> UploadFileAsync(string objectName, byte[] content, string contentType, string fileName)
     {
+        if (ThrowOnUpload)
+        {
+            throw new InvalidOperationException("Mock upload failure.");
+        }
+
         return Task.FromResult(new UploadResponse("mock-file-id", content.Length));
     }
 

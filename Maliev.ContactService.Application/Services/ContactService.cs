@@ -123,7 +123,8 @@ public class ContactService : IContactService
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError(ex, "Failed to upload file {FileName} for contact {ContactId}, continuing submission.", fileRequest.FileName, contactMessage.Id);
+                            _logger.LogError(ex, "Failed to upload file {FileName} for contact {ContactId}. Rejecting contact submission.", fileRequest.FileName, contactMessage.Id);
+                            throw new InvalidOperationException($"Could not attach file '{fileRequest.FileName}'.", ex);
                         }
                     }
 

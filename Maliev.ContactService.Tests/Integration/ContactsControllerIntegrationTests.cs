@@ -342,6 +342,8 @@ public class ContactsControllerIntegrationTests : BaseIntegrationTest
     public async Task CreateContactMessage_WithFiles_UploadsSuccessfully()
     {
         // Arrange
+        var notificationPublisher = Factory.Services.GetRequiredService<CapturingContactNotificationPublisher>();
+        notificationPublisher.Reset();
         var request = new CreateContactMessageRequest
         {
             FullName = "With Files Test",
@@ -363,14 +365,58 @@ public class ContactsControllerIntegrationTests : BaseIntegrationTest
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var result = await GetResponseAsync<ContactMessageDto>(response);
         Assert.NotNull(result);
+        var returnedFile = Assert.Single(result!.Files);
+        Assert.Equal("test.txt", returnedFile.FileName);
+        Assert.Equal("text/plain", returnedFile.ContentType);
+        Assert.Equal(3, returnedFile.FileSize);
+
+        var publishedMessage = Assert.Single(notificationPublisher.PublishedMessages);
+        var publishedFile = Assert.Single(publishedMessage.Files);
+        Assert.Equal("test.txt", publishedFile.FileName);
 
         // Check that files endpoint returns files
         var client = Factory.CreateAuthenticatedClient();
-        var filesResponse = await client.GetAsync($"/contact/v1/contacts/{result!.Id}/files");
+        var filesResponse = await client.GetAsync($"/contact/v1/contacts/{result.Id}/files");
         Assert.Equal(HttpStatusCode.OK, filesResponse.StatusCode);
         var files = await GetResponseAsync<IEnumerable<ContactFileDto>>(filesResponse);
         Assert.NotNull(files);
         Assert.Single(files!);
+    }
+
+    [Fact]
+    public async Task CreateContactMessage_WithFileUploadFailure_DoesNotAcceptRequest()
+    {
+        // Arrange
+        var notificationPublisher = Factory.Services.GetRequiredService<CapturingContactNotificationPublisher>();
+        notificationPublisher.Reset();
+        MockUploadServiceClient.ThrowOnUpload = true;
+        var request = new CreateContactMessageRequest
+        {
+            FullName = "Failed File Upload",
+            Email = "failedfile@example.com",
+            Subject = "Test Subject with failed file",
+            Message = "Test Message with failed file",
+            CountryId = Guid.Empty,
+            ContactType = ContactType.General,
+            Files =
+            [
+                new() { FileName = "missing.txt", FileContent = new byte[] { 1, 2, 3 }, ContentType = "text/plain" }
+            ]
+        };
+
+        try
+        {
+            // Act
+            var response = await Client.PostAsJsonAsync("/contact/v1/contacts", request);
+
+            // Assert
+            Assert.False(response.IsSuccessStatusCode);
+            Assert.Empty(notificationPublisher.PublishedMessages);
+        }
+        finally
+        {
+            MockUploadServiceClient.ThrowOnUpload = false;
+        }
     }
 
     [Fact]
