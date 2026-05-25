@@ -16,14 +16,15 @@ public sealed class MassTransitContactNotificationPublisher(
     ILogger<MassTransitContactNotificationPublisher> logger) : IContactNotificationPublisher
 {
     private const string ContactInboxUserId = "maliev-contact-inbox";
-    private const string NotificationTemplateId = "contact-message-submitted";
+    private const string ContactInboxTemplateId = "contact-message-submitted";
+    private const string CustomerCopyTemplateId = "contact-message-customer-copy";
 
     /// <inheritdoc />
     public async Task PublishContactMessageSubmittedAsync(ContactMessageDto contactMessage, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(contactMessage);
 
-        var notificationEvent = new NotificationEvent(
+        var inboxNotification = new NotificationEvent(
             MessageId: Guid.NewGuid(),
             MessageName: nameof(NotificationEvent),
             MessageType: MessageType.Event,
@@ -38,17 +39,37 @@ public sealed class MassTransitContactNotificationPublisher(
                 NotificationType: "ContactMessageSubmitted",
                 Priority: MapPriority(contactMessage.Priority),
                 TargetUsers: [new NotificationEventPayloadTargetUsersItem(ContactInboxUserId, "staff")],
-                TemplateId: NotificationTemplateId,
-                Parameters: BuildParameters(contactMessage),
+                TemplateId: ContactInboxTemplateId,
+                Parameters: BuildInboxParameters(contactMessage),
                 Metadata: new NotificationEventPayloadMetadata("en", "ContactService")));
 
-        await publishEndpoint.Publish(notificationEvent, cancellationToken);
+        var customerCopyNotification = new NotificationEvent(
+            MessageId: Guid.NewGuid(),
+            MessageName: nameof(NotificationEvent),
+            MessageType: MessageType.Event,
+            MessageVersion: "1.0",
+            PublishedBy: "ContactService",
+            ConsumedBy: ["NotificationService"],
+            CorrelationId: inboxNotification.CorrelationId,
+            CausationId: inboxNotification.MessageId,
+            OccurredAtUtc: DateTimeOffset.UtcNow,
+            IsPublic: false,
+            Payload: new NotificationEventPayload(
+                NotificationType: "ContactMessageCustomerCopy",
+                Priority: MapPriority(contactMessage.Priority),
+                TargetUsers: [new NotificationEventPayloadTargetUsersItem($"contact-message-{contactMessage.Id}-customer", "direct-email")],
+                TemplateId: CustomerCopyTemplateId,
+                Parameters: BuildCustomerCopyParameters(contactMessage),
+                Metadata: new NotificationEventPayloadMetadata("en", "ContactService")));
+
+        await publishEndpoint.Publish(inboxNotification, cancellationToken);
+        await publishEndpoint.Publish(customerCopyNotification, cancellationToken);
         logger.LogInformation(
-            "Published contact message notification for ContactId={ContactId}",
+            "Published contact message inbox and customer-copy notifications for ContactId={ContactId}",
             contactMessage.Id);
     }
 
-    private static IReadOnlyDictionary<string, string> BuildParameters(ContactMessageDto contactMessage)
+    private static IReadOnlyDictionary<string, string> BuildInboxParameters(ContactMessageDto contactMessage)
     {
         return new Dictionary<string, string>
         {
@@ -58,13 +79,23 @@ public sealed class MassTransitContactNotificationPublisher(
             ["phoneNumber"] = contactMessage.PhoneNumber ?? string.Empty,
             ["company"] = contactMessage.Company ?? string.Empty,
             ["subject"] = contactMessage.Subject,
-            ["message"] = contactMessage.Message,
-            ["countryId"] = contactMessage.CountryId.ToString(),
             ["contactType"] = contactMessage.ContactType.ToString(),
             ["priority"] = contactMessage.Priority.ToString(),
             ["attachmentCount"] = contactMessage.Files.Count.ToString(CultureInfo.InvariantCulture),
             ["attachmentNames"] = string.Join(", ", contactMessage.Files.Select(file => file.FileName))
         };
+    }
+
+    private static IReadOnlyDictionary<string, string> BuildCustomerCopyParameters(ContactMessageDto contactMessage)
+    {
+        var parameters = new Dictionary<string, string>(BuildInboxParameters(contactMessage))
+        {
+            ["recipientEmail"] = contactMessage.Email,
+            ["recipientName"] = contactMessage.FullName,
+            ["message"] = contactMessage.Message
+        };
+
+        return parameters;
     }
 
     private static string MapPriority(Priority priority)
