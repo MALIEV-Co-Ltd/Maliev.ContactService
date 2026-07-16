@@ -9,6 +9,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using System.Security.Cryptography;
+using System.Text;
 using Testcontainers.PostgreSql;
 using Testcontainers.RabbitMq;
 using Testcontainers.Redis;
@@ -83,13 +85,22 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
     {
         builder.UseEnvironment("Testing");
 
+        using var rsa = RSA.Create(2048);
+
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:ContactDbContext"] = ConnectionString,
                 ["ConnectionStrings:rabbitmq"] = RabbitMqConnectionString,
                 ["ConnectionStrings:redis"] = RedisConnectionString,
-                ["CORS:AllowedOrigins:0"] = "https://localhost:5001"
+                ["CORS:AllowedOrigins:0"] = "https://localhost:5001",
+                ["ServiceAuthentication:ClientId"] = "service-contact-service",
+                ["ServiceAuthentication:ClientSecret"] = "contact-test-secret-with-at-least-32-bytes",
+                ["Services:AuthService:BaseUrl"] = "http://127.0.0.1:5000",
+                ["Jwt:PublicKey"] = Convert.ToBase64String(
+                    Encoding.UTF8.GetBytes(rsa.ExportSubjectPublicKeyInfoPem())),
+                ["Jwt:Issuer"] = "https://api.maliev.com",
+                ["Jwt:Audience"] = "https://api.maliev.com"
             })
             .Build();
 #pragma warning restore CS0618
