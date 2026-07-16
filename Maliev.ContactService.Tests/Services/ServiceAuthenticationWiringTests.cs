@@ -8,6 +8,7 @@ using Microsoft.Extensions.Http;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Reflection;
+using System.Text;
 
 namespace Maliev.ContactService.Tests.Services;
 
@@ -81,7 +82,8 @@ public sealed class ServiceAuthenticationWiringTests
         configuration["ServiceAuthentication:ClientId"] = "service-contact-service";
         configuration["ServiceAuthentication:ClientSecret"] = "contact-test-secret-with-at-least-32-bytes";
         configuration["Services:AuthService:BaseUrl"] = "http://127.0.0.1:5000";
-        configuration["Jwt:PublicKey"] = Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo());
+        configuration["Jwt:PublicKey"] = Convert.ToBase64String(
+            Encoding.UTF8.GetBytes(rsa.ExportSubjectPublicKeyInfoPem()));
         configuration["Jwt:Issuer"] = "https://api.maliev.com";
         configuration["Jwt:Audience"] = "https://api.maliev.com";
     }

@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System.Security.Cryptography;
+using System.Text;
 using Testcontainers.PostgreSql;
 using Testcontainers.RabbitMq;
 using Testcontainers.Redis;
@@ -96,7 +97,8 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
                 ["ServiceAuthentication:ClientId"] = "service-contact-service",
                 ["ServiceAuthentication:ClientSecret"] = "contact-test-secret-with-at-least-32-bytes",
                 ["Services:AuthService:BaseUrl"] = "http://127.0.0.1:5000",
-                ["Jwt:PublicKey"] = Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo()),
+                ["Jwt:PublicKey"] = Convert.ToBase64String(
+                    Encoding.UTF8.GetBytes(rsa.ExportSubjectPublicKeyInfoPem())),
                 ["Jwt:Issuer"] = "https://api.maliev.com",
                 ["Jwt:Audience"] = "https://api.maliev.com"
             })
