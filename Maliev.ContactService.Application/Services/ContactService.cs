@@ -51,7 +51,9 @@ public class ContactService : IContactService
     }
 
     /// <inheritdoc/>
-    public async Task<ContactMessageDto> CreateContactMessageAsync(CreateContactMessageRequest request)
+    public async Task<ContactMessageDto> CreateContactMessageAsync(
+        CreateContactMessageRequest request,
+        CancellationToken cancellationToken = default)
     {
         if (request == null) throw new ArgumentNullException(nameof(request));
 
@@ -59,7 +61,9 @@ public class ContactService : IContactService
         var strategy = _context.Database.CreateExecutionStrategy();
 
         var isDuplicate = await strategy.ExecuteAsync(async () =>
-            await _context.ContactMessages.AnyAsync(c => c.Email == request.Email && c.CreatedAt > sixtySecondsAgo));
+            await _context.ContactMessages.AnyAsync(
+                c => c.Email == request.Email && c.CreatedAt > sixtySecondsAgo,
+                cancellationToken));
 
         if (isDuplicate)
         {
@@ -77,7 +81,7 @@ public class ContactService : IContactService
 
         var createdMessage = await strategy.ExecuteAsync(async () =>
         {
-            using var transaction = await _context.Database.BeginTransactionAsync();
+            using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
             try
             {
                 var contactMessage = new ContactMessage
@@ -97,7 +101,7 @@ public class ContactService : IContactService
                 };
 
                 _context.ContactMessages.Add(contactMessage);
-                await _context.SaveChangesAsync();
+                await _context.SaveChangesAsync(cancellationToken);
 
                 if (request.Files.Any())
                 {
@@ -107,7 +111,12 @@ public class ContactService : IContactService
                         try
                         {
                             var objectName = $"contacts/{contactMessage.Id}/{Guid.NewGuid()}_{fileRequest.FileName}";
-                            var uploadResponse = await _uploadService.UploadFileAsync(objectName, fileRequest.FileContent, fileRequest.ContentType ?? "application/octet-stream", fileRequest.FileName);
+                            var uploadResponse = await _uploadService.UploadFileAsync(
+                                objectName,
+                                fileRequest.FileContent,
+                                fileRequest.ContentType ?? "application/octet-stream",
+                                fileRequest.FileName,
+                                cancellationToken);
 
                             var contactFile = new ContactFile
                             {
@@ -121,6 +130,10 @@ public class ContactService : IContactService
                             };
                             uploadedFiles.Add(contactFile);
                         }
+                        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                        {
+                            throw;
+                        }
                         catch (Exception ex)
                         {
                             _logger.LogError(ex, "Failed to upload file {FileName} for contact {ContactId}. Rejecting contact submission.", fileRequest.FileName, contactMessage.Id);
@@ -131,14 +144,19 @@ public class ContactService : IContactService
                     if (uploadedFiles.Any())
                     {
                         _context.ContactFiles.AddRange(uploadedFiles);
-                        await _context.SaveChangesAsync();
+                        await _context.SaveChangesAsync(cancellationToken);
                     }
                 }
 
-                await transaction.CommitAsync();
+                await transaction.CommitAsync(cancellationToken);
 
                 _logger.LogInformation("Contact inquiry created successfully. ID={ContactId}", contactMessage.Id);
                 return contactMessage.ToDto();
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+                throw;
             }
             catch (Exception ex)
             {
@@ -262,16 +280,25 @@ public class ContactService : IContactService
     }
 
     /// <inheritdoc/>
-    public async Task DeleteContactFileAsync(int contactId, int fileId)
+    public async Task DeleteContactFileAsync(
+        int contactId,
+        int fileId,
+        CancellationToken cancellationToken = default)
     {
-        var file = await _context.ContactFiles.FirstOrDefaultAsync(f => f.Id == fileId && f.ContactMessageId == contactId);
+        var file = await _context.ContactFiles.FirstOrDefaultAsync(
+            f => f.Id == fileId && f.ContactMessageId == contactId,
+            cancellationToken);
         if (file == null) throw new NotFoundException($"Contact file with id {fileId} for contact {contactId} not found");
 
         if (!string.IsNullOrEmpty(file.UploadServiceFileId))
         {
             try
             {
-                await _uploadService.DeleteFileAsync(file.UploadServiceFileId);
+                await _uploadService.DeleteFileAsync(file.UploadServiceFileId, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -280,7 +307,7 @@ public class ContactService : IContactService
         }
 
         _context.ContactFiles.Remove(file);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
 
         await InvalidateListCacheAsync();
         await _cache.RemoveAsync($"contact_message_{contactId}");

@@ -41,15 +41,18 @@ public class ContactsController : ControllerBase
     /// Submit a contact form message
     /// </summary>
     /// <param name="request">The contact form data</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>The created contact message</returns>
     [HttpPost]
     [AllowAnonymous]
     [EnableRateLimiting(RateLimitPolicies.Public)]
-    public async Task<ActionResult<ContactMessageDto>> CreateContactMessage(CreateContactMessageRequest request)
+    public async Task<ActionResult<ContactMessageDto>> CreateContactMessage(
+        CreateContactMessageRequest request,
+        CancellationToken cancellationToken)
     {
         // Let ExceptionHandlingMiddleware handle exceptions for proper status codes
         // (409 for DuplicateInquiryException, 503 for CountryServiceException, etc.)
-        var contact = await _contactService.CreateContactMessageAsync(request);
+        var contact = await _contactService.CreateContactMessageAsync(request, cancellationToken);
 
         return CreatedAtAction(
             nameof(GetContactMessage),
@@ -188,15 +191,19 @@ public class ContactsController : ControllerBase
     /// </summary>
     /// <param name="id">Contact message ID</param>
     /// <param name="fileId">File ID</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>No content if successful</returns>
     [HttpDelete("{id}/files/{fileId}")]
     [RequirePermission(ContactPermissions.Contacts.Delete)]
     [EnableRateLimiting(RateLimitPolicies.Api)]
-    public async Task<IActionResult> DeleteContactFile(int id, int fileId)
+    public async Task<IActionResult> DeleteContactFile(
+        int id,
+        int fileId,
+        CancellationToken cancellationToken)
     {
         try
         {
-            await _contactService.DeleteContactFileAsync(id, fileId);
+            await _contactService.DeleteContactFileAsync(id, fileId, cancellationToken);
             return NoContent();
         }
         catch (Maliev.ContactService.Application.Exceptions.NotFoundException)
@@ -210,11 +217,15 @@ public class ContactsController : ControllerBase
     /// </summary>
     /// <param name="id">Contact message ID</param>
     /// <param name="fileId">File ID</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>The file content</returns>
     [HttpGet("{id}/files/{fileId}/download")]
     [RequirePermission(ContactPermissions.Contacts.Read)]
     [EnableRateLimiting(RateLimitPolicies.Api)]
-    public async Task<IActionResult> DownloadContactFile(int id, int fileId)
+    public async Task<IActionResult> DownloadContactFile(
+        int id,
+        int fileId,
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -225,12 +236,18 @@ public class ContactsController : ControllerBase
                 return NotFound();
             }
 
-            var downloadResponse = await _uploadService.DownloadFileAsync(file.UploadServiceFileId);
+            var downloadResponse = await _uploadService.DownloadFileAsync(
+                file.UploadServiceFileId,
+                cancellationToken);
             return File(downloadResponse.Content, downloadResponse.ContentType, downloadResponse.FileName);
         }
         catch (Maliev.ContactService.Application.Exceptions.NotFoundException)
         {
             return NotFound();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {

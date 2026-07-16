@@ -1,18 +1,50 @@
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Maliev.ContactService.Application.Interfaces;
+using Microsoft.Extensions.Configuration;
 
 namespace Maliev.ContactService.Infrastructure.ExternalServices;
 
+/// <summary>
+/// Calls UploadService for file metadata operations and transfers bytes through signed storage URLs.
+/// </summary>
 public class UploadServiceClient : IUploadServiceClient
 {
-    private readonly HttpClient _httpClient;
+    /// <summary>
+    /// The named client used only for unsigned storage transfers.
+    /// </summary>
+    public const string StorageHttpClientName = "ContactService.StorageTransfer";
 
-    public UploadServiceClient(HttpClient httpClient)
+    private const int SignedUrlExpirationMinutes = 5;
+    private readonly bool _allowInsecureStorageUrls;
+    private readonly HttpClient _httpClient;
+    private readonly IHttpClientFactory _httpClientFactory;
+
+    /// <summary>
+    /// Initializes a new UploadService client.
+    /// </summary>
+    /// <param name="httpClient">The authenticated UploadService client.</param>
+    /// <param name="httpClientFactory">Factory for the isolated storage-transfer client.</param>
+    /// <param name="configuration">Application configuration.</param>
+    public UploadServiceClient(
+        HttpClient httpClient,
+        IHttpClientFactory httpClientFactory,
+        IConfiguration configuration)
     {
         _httpClient = httpClient;
+        _httpClientFactory = httpClientFactory;
+        _allowInsecureStorageUrls = configuration.GetValue<bool>(
+            "ExternalServices:UploadService:AllowInsecureStorageUrls");
     }
 
-    public async Task<UploadResponse> UploadFileAsync(string objectName, byte[] content, string contentType, string fileName)
+    /// <inheritdoc/>
+    public async Task<UploadResponse> UploadFileAsync(
+        string objectName,
+        byte[] content,
+        string contentType,
+        string fileName,
+        CancellationToken cancellationToken = default)
     {
         var initiateRequest = new InitiateResumableUploadRequest(
             Path: objectName,
@@ -22,47 +54,134 @@ public class UploadServiceClient : IUploadServiceClient
             TotalSize: content.LongLength,
             Overwrite: true);
 
-        var initiateResponse = await _httpClient.PostAsJsonAsync("/upload/v1/uploads/resumable", initiateRequest);
+        using var initiateResponse = await _httpClient.PostAsJsonAsync(
+            "/upload/v1/uploads/resumable",
+            initiateRequest,
+            cancellationToken);
         initiateResponse.EnsureSuccessStatusCode();
 
-        var session = await initiateResponse.Content.ReadFromJsonAsync<InitiateResumableUploadResponse>()
-            ?? throw new InvalidOperationException("Upload service returned null resumable session");
+        var session = await initiateResponse.Content.ReadFromJsonAsync<InitiateResumableUploadResponse>(
+            cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Upload service returned an empty resumable session.");
+        var sessionUri = ValidateStorageUri(session.SessionUri, "resumable upload session");
 
-        using var gcsClient = new HttpClient();
         using var uploadContent = new ByteArrayContent(content);
-        uploadContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+        uploadContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
         uploadContent.Headers.ContentLength = content.LongLength;
-        uploadContent.Headers.ContentRange = new System.Net.Http.Headers.ContentRangeHeaderValue(0, content.LongLength - 1, content.LongLength);
+        uploadContent.Headers.ContentRange = new ContentRangeHeaderValue(
+            0,
+            content.LongLength - 1,
+            content.LongLength);
 
-        var gcsResponse = await gcsClient.PutAsync(session.SessionUri, uploadContent);
-        gcsResponse.EnsureSuccessStatusCode();
+        var storageClient = _httpClientFactory.CreateClient(StorageHttpClientName);
+        using var storageResponse = await storageClient.PutAsync(sessionUri, uploadContent, cancellationToken);
+        storageResponse.EnsureSuccessStatusCode();
 
-        var response = await _httpClient.PostAsJsonAsync($"/upload/v1/uploads/resumable/{session.UploadId}/complete", new { });
-        response.EnsureSuccessStatusCode();
+        var escapedUploadId = Uri.EscapeDataString(session.UploadId);
+        using var completeResponse = await _httpClient.PostAsJsonAsync(
+            $"/upload/v1/uploads/resumable/{escapedUploadId}/complete",
+            new { },
+            cancellationToken);
+        completeResponse.EnsureSuccessStatusCode();
 
-        var result = await response.Content.ReadFromJsonAsync<UploadServiceResponse>();
-        return new UploadResponse(result!.UploadId, result.FileSize);
+        var result = await completeResponse.Content.ReadFromJsonAsync<UploadServiceResponse>(
+            cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Upload service returned an empty completion response.");
+        return new UploadResponse(result.UploadId, result.FileSize);
     }
 
-    public async Task DeleteFileAsync(string fileId)
+    /// <inheritdoc/>
+    public async Task DeleteFileAsync(string fileId, CancellationToken cancellationToken = default)
     {
-        var response = await _httpClient.DeleteAsync($"/v1/files/{fileId}");
+        var escapedFileId = Uri.EscapeDataString(fileId);
+        using var response = await _httpClient.DeleteAsync(
+            $"/upload/v1/files/{escapedFileId}",
+            cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
-    public async Task<DownloadResponse> DownloadFileAsync(string fileId)
+    /// <inheritdoc/>
+    public async Task<DownloadResponse> DownloadFileAsync(
+        string fileId,
+        CancellationToken cancellationToken = default)
     {
-        var response = await _httpClient.GetAsync($"/v1/files/{fileId}/download");
-        response.EnsureSuccessStatusCode();
+        var escapedFileId = Uri.EscapeDataString(fileId);
+        using var signedUrlResponse = await _httpClient.PostAsJsonAsync(
+            $"/upload/v1/files/{escapedFileId}/signed-url",
+            new GenerateSignedUrlRequest(SignedUrlExpirationMinutes),
+            cancellationToken);
+        signedUrlResponse.EnsureSuccessStatusCode();
 
-        var content = await response.Content.ReadAsByteArrayAsync();
-        var contentType = response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
-        var fileName = response.Content.Headers.ContentDisposition?.FileName ?? "file";
+        SignedUrlResponse signedUrl;
+        try
+        {
+            signedUrl = await signedUrlResponse.Content.ReadFromJsonAsync<SignedUrlResponse>(
+                cancellationToken: cancellationToken)
+                ?? throw new InvalidOperationException("Upload service returned an empty signed URL response.");
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException("Upload service returned a malformed signed URL response.", ex);
+        }
+        var downloadUri = ValidateStorageUri(signedUrl.SignedUrl, "signed download URL");
 
-        return new DownloadResponse(content, contentType, fileName);
+        var storageClient = _httpClientFactory.CreateClient(StorageHttpClientName);
+        using var downloadResponse = await storageClient.GetAsync(
+            downloadUri,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+        downloadResponse.EnsureSuccessStatusCode();
+
+        var bytes = await downloadResponse.Content.ReadAsByteArrayAsync(cancellationToken);
+        var contentType = downloadResponse.Content.Headers.ContentType?.MediaType
+            ?? "application/octet-stream";
+        var fileName = GetSafeFileName(downloadResponse, signedUrl.StoragePath);
+
+        return new DownloadResponse(bytes, contentType, fileName);
     }
 
-    private record UploadServiceResponse(string UploadId, long FileSize);
+    private string ValidateStorageUri(string? value, string description)
+    {
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeHttps
+                && !(_allowInsecureStorageUrls
+                    && uri.Scheme == Uri.UriSchemeHttp
+                    && uri.IsLoopback)))
+        {
+            throw new InvalidOperationException(
+                $"Upload service returned an invalid or insecure {description}.");
+        }
+
+        return uri.AbsoluteUri;
+    }
+
+    private static string GetSafeFileName(HttpResponseMessage response, string? storagePath)
+    {
+        var headerFileName = response.Content.Headers.ContentDisposition?.FileNameStar
+            ?? response.Content.Headers.ContentDisposition?.FileName;
+        var candidate = string.IsNullOrWhiteSpace(headerFileName)
+            ? Path.GetFileName((storagePath ?? string.Empty).Replace('\\', '/'))
+            : headerFileName.Trim('"');
+        candidate = Path.GetFileName(candidate.Replace('\\', '/'));
+
+        return string.IsNullOrWhiteSpace(candidate) || IsUnsafeFileName(candidate)
+            ? "file"
+            : candidate;
+    }
+
+    private static bool IsUnsafeFileName(string value) =>
+        value.Any(char.IsControl)
+        || value.IndexOfAny(['/', '\\', ':', '*', '?', '"', '<', '>', '|']) >= 0;
+
+    private sealed record UploadServiceResponse(string UploadId, long FileSize);
+
+    private sealed record GenerateSignedUrlRequest(int ExpirationMinutes);
+
+    private sealed record SignedUrlResponse(
+        string? SignedUrl,
+        DateTime ExpiresAt,
+        string? UploadId,
+        string? StoragePath);
 
     private sealed record InitiateResumableUploadRequest(
         string Path,

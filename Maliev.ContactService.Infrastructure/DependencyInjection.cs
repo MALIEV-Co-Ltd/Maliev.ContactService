@@ -34,6 +34,15 @@ public static class DependencyInjection
         .AddServiceDiscovery()
         .AddHttpMessageHandler<ServiceAccountAuthenticationHandler>();
 
+        services.AddHttpClient(UploadServiceClient.StorageHttpClientName, client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(15);
+        })
+        .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+        {
+            AllowAutoRedirect = false
+        });
+
         services.AddHttpClient<ICountryServiceClient, CountryServiceClient>(client =>
         {
             client.BaseAddress = new Uri(
