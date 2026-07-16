@@ -167,6 +167,25 @@ public class InfrastructureServiceTests
 
         Assert.Contains("client.Timeout = TimeSpan.FromSeconds(5);", source, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void DependencyInjection_StorageTransferClient_DisablesRedirectsAndCookies()
+    {
+        var sourcePath = Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "..",
+            "..",
+            "..",
+            "Maliev.ContactService.Infrastructure",
+            "DependencyInjection.cs"));
+
+        Assert.True(File.Exists(sourcePath), $"Could not find source file: {sourcePath}");
+        var source = File.ReadAllText(sourcePath);
+
+        Assert.Contains("AllowAutoRedirect = false", source, StringComparison.Ordinal);
+        Assert.Contains("UseCookies = false", source, StringComparison.Ordinal);
+    }
 }
 
 public class EntityTests
