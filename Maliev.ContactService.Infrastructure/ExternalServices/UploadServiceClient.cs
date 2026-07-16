@@ -16,6 +16,7 @@ public class UploadServiceClient : IUploadServiceClient
     /// </summary>
     public const string StorageHttpClientName = "ContactService.StorageTransfer";
 
+    private const string ServiceName = "contact-service";
     private const int SignedUrlExpirationMinutes = 5;
     private readonly bool _allowInsecureStorageUrls;
     private readonly HttpClient _httpClient;
@@ -49,7 +50,7 @@ public class UploadServiceClient : IUploadServiceClient
         var initiateRequest = new InitiateResumableUploadRequest(
             Path: objectName,
             FileName: fileName,
-            ServiceName: "ContactService",
+            ServiceName: ServiceName,
             ContentType: contentType,
             TotalSize: content.LongLength,
             Overwrite: true);
@@ -60,9 +61,16 @@ public class UploadServiceClient : IUploadServiceClient
             cancellationToken);
         initiateResponse.EnsureSuccessStatusCode();
 
-        var session = await initiateResponse.Content.ReadFromJsonAsync<InitiateResumableUploadResponse>(
-            cancellationToken: cancellationToken)
-            ?? throw new InvalidOperationException("Upload service returned an empty resumable session.");
+        var session = await ReadRequiredJsonAsync<InitiateResumableUploadResponse>(
+            initiateResponse.Content,
+            "resumable session",
+            cancellationToken);
+        if (string.IsNullOrWhiteSpace(session.UploadId))
+        {
+            throw new InvalidOperationException(
+                "Upload service returned an incomplete resumable session response.");
+        }
+
         var sessionUri = ValidateStorageUri(session.SessionUri, "resumable upload session");
 
         using var uploadContent = new ByteArrayContent(content);
@@ -84,9 +92,16 @@ public class UploadServiceClient : IUploadServiceClient
             cancellationToken);
         completeResponse.EnsureSuccessStatusCode();
 
-        var result = await completeResponse.Content.ReadFromJsonAsync<UploadServiceResponse>(
-            cancellationToken: cancellationToken)
-            ?? throw new InvalidOperationException("Upload service returned an empty completion response.");
+        var result = await ReadRequiredJsonAsync<UploadServiceResponse>(
+            completeResponse.Content,
+            "completion",
+            cancellationToken);
+        if (string.IsNullOrWhiteSpace(result.UploadId) || result.FileSize < 0)
+        {
+            throw new InvalidOperationException(
+                "Upload service returned an incomplete completion response.");
+        }
+
         return new UploadResponse(result.UploadId, result.FileSize);
     }
 
@@ -112,17 +127,10 @@ public class UploadServiceClient : IUploadServiceClient
             cancellationToken);
         signedUrlResponse.EnsureSuccessStatusCode();
 
-        SignedUrlResponse signedUrl;
-        try
-        {
-            signedUrl = await signedUrlResponse.Content.ReadFromJsonAsync<SignedUrlResponse>(
-                cancellationToken: cancellationToken)
-                ?? throw new InvalidOperationException("Upload service returned an empty signed URL response.");
-        }
-        catch (JsonException ex)
-        {
-            throw new InvalidOperationException("Upload service returned a malformed signed URL response.", ex);
-        }
+        var signedUrl = await ReadRequiredJsonAsync<SignedUrlResponse>(
+            signedUrlResponse.Content,
+            "signed URL",
+            cancellationToken);
         var downloadUri = ValidateStorageUri(signedUrl.SignedUrl, "signed download URL");
 
         var storageClient = _httpClientFactory.CreateClient(StorageHttpClientName);
@@ -143,6 +151,7 @@ public class UploadServiceClient : IUploadServiceClient
     private string ValidateStorageUri(string? value, string description)
     {
         if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            || !string.IsNullOrEmpty(uri.UserInfo)
             || (uri.Scheme != Uri.UriSchemeHttps
                 && !(_allowInsecureStorageUrls
                     && uri.Scheme == Uri.UriSchemeHttp
@@ -153,6 +162,25 @@ public class UploadServiceClient : IUploadServiceClient
         }
 
         return uri.AbsoluteUri;
+    }
+
+    private static async Task<T> ReadRequiredJsonAsync<T>(
+        HttpContent content,
+        string responseDescription,
+        CancellationToken cancellationToken)
+        where T : class
+    {
+        try
+        {
+            return await content.ReadFromJsonAsync<T>(cancellationToken: cancellationToken)
+                ?? throw new InvalidOperationException(
+                    $"Upload service returned an empty {responseDescription} response.");
+        }
+        catch (JsonException)
+        {
+            throw new InvalidOperationException(
+                $"Upload service returned a malformed {responseDescription} response.");
+        }
     }
 
     private static string GetSafeFileName(HttpResponseMessage response, string? storagePath)
@@ -173,7 +201,7 @@ public class UploadServiceClient : IUploadServiceClient
         value.Any(char.IsControl)
         || value.IndexOfAny(['/', '\\', ':', '*', '?', '"', '<', '>', '|']) >= 0;
 
-    private sealed record UploadServiceResponse(string UploadId, long FileSize);
+    private sealed record UploadServiceResponse(string? UploadId, long FileSize);
 
     private sealed record GenerateSignedUrlRequest(int ExpirationMinutes);
 
@@ -192,8 +220,8 @@ public class UploadServiceClient : IUploadServiceClient
         bool Overwrite);
 
     private sealed record InitiateResumableUploadResponse(
-        string UploadId,
-        string SessionUri,
+        string? UploadId,
+        string? SessionUri,
         DateTime ExpiresAt,
         long TotalSize);
 }

@@ -40,7 +40,8 @@ public static class DependencyInjection
         })
         .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
         {
-            AllowAutoRedirect = false
+            AllowAutoRedirect = false,
+            UseCookies = false
         });
 
         services.AddHttpClient<ICountryServiceClient, CountryServiceClient>(client =>
