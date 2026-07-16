@@ -1,5 +1,4 @@
 using Maliev.Aspire.ServiceDefaults.Authorization;
-using Maliev.Aspire.ServiceDefaults.IAM;
 using Maliev.ContactService.Application.Interfaces;
 using Maliev.ContactService.Infrastructure.BackgroundServices;
 using Maliev.ContactService.Infrastructure.ExternalServices;
@@ -7,6 +6,7 @@ using Maliev.ContactService.Infrastructure.Metrics;
 using Maliev.ContactService.Infrastructure.Persistence;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace Maliev.ContactService.Infrastructure;
 
@@ -32,7 +32,7 @@ public static class DependencyInjection
             client.Timeout = TimeSpan.FromSeconds(5);
         })
         .AddServiceDiscovery()
-        .AddHttpMessageHandler<ServiceAccountAuthenticationHandler>();
+        .AddAuthServiceAuthentication();
 
         services.AddHttpClient(UploadServiceClient.StorageHttpClientName, client =>
         {
@@ -52,7 +52,7 @@ public static class DependencyInjection
                 ?? "https+http://CountryService");
         })
         .AddServiceDiscovery()
-        .AddHttpMessageHandler<ServiceAccountAuthenticationHandler>();
+        .AddAuthServiceAuthentication();
 
         return services;
     }

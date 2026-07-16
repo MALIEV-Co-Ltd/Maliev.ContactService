@@ -48,6 +48,7 @@ try
 
     // JWT Authentication (tests override via PostConfigureAll with dynamic RSA keys)
     builder.AddJwtAuthentication();
+    builder.AddAuthServiceTokenExchange("ContactService");
 
     // --- Authorization & Permissions ---
     builder.Services.AddPermissionAuthorization();
@@ -75,7 +76,6 @@ try
     builder.AddStandardRateLimiting(); // Memory-optimized for low-spec nodes
 
     // IAM Registration Service
-    builder.AddIAMServiceClient("contact");
     builder.Services.AddIAMRegistration<ContactIAMRegistrationService>("contact");
 
     builder.Services.AddControllers();
