@@ -44,7 +44,14 @@
     <ProjectReference Include="..\Maliev.ContactService.Application\Maliev.ContactService.Application.csproj" />
     <ProjectReference Include="..\Maliev.ContactService.Domain\Maliev.ContactService.Domain.csproj" />
     <ProjectReference Include="..\Maliev.ContactService.Infrastructure\Maliev.ContactService.Infrastructure.csproj" />
-    <ProjectReference Include="..\..\Maliev.Aspire\Maliev.Aspire.ServiceDefaults\Maliev.Aspire.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(SharedSourceRoot)' != ''">
+    <ProjectReference Include="$(SharedSourceRoot)\Maliev.Aspire\Maliev.Aspire.ServiceDefaults\Maliev.Aspire.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(SharedSourceRoot)' == ''">
+    <PackageReference Include="Maliev.Aspire.ServiceDefaults" Version="$(SharedLibraryVersion)" />
   </ItemGroup>
 
 </Project>

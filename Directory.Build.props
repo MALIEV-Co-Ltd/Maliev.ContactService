@@ -1,6 +1,7 @@
 <Project>
   <PropertyGroup>
     <SharedLibraryVersion Condition="'$(SharedLibraryVersion)' == ''">1.0.*-alpha*</SharedLibraryVersion>
+    <SharedSourceRoot Condition="'$(SharedSourceRoot)' == '' And Exists('../../Maliev.Aspire/Maliev.Aspire.ServiceDefaults/Maliev.Aspire.ServiceDefaults.csproj') And Exists('../../Maliev.MessagingContracts/generated/csharp/Maliev.MessagingContracts.csproj')">../..</SharedSourceRoot>
   </PropertyGroup>
 
   <ItemGroup>
