@@ -124,12 +124,16 @@ dotnet test --verbosity normal
 
 ---
 
-## 📦 Deployment
+## ✅ Validation and release boundary
 
-Infrastructure management is handled via GitOps patterns.
+Pull requests, `main`, `develop`, and `release/v*` tags run the same read-only
+.NET validation workflow. Validation checks out immutable public revisions of
+the MALIEV shared sources and restores only from NuGet.org, so it does not need
+repository secrets or package credentials.
 
-- **Docker Image**: `REGION-docker.pkg.dev/PROJECT_ID/REPOSITORY/maliev-contact-service:{sha}`
-- **Environments**: Development, Staging, Production
+No workflow in this repository publishes images, authenticates to Google
+Cloud, changes GitOps, or deploys to GKE. Release remains pending Aspire owner
+review and must be introduced later as a separate, explicitly approved flow.
 
 ---
 
