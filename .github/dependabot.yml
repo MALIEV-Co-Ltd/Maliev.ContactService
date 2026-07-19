@@ -10,8 +10,9 @@ updates:
         update-types:
           - "minor"
           - "patch"
+
   - package-ecosystem: "docker"
-    directory: "/Maliev.MessageService.Api"
+    directory: "/Maliev.ContactService.Api"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
