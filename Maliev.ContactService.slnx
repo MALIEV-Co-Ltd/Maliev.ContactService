@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="Maliev.ContactService.Api/Maliev.ContactService.Api.csproj" />
+  <Project Path="Maliev.ContactService.Application/Maliev.ContactService.Application.csproj" />
+  <Project Path="Maliev.ContactService.Domain/Maliev.ContactService.Domain.csproj" />
+  <Project Path="Maliev.ContactService.Infrastructure/Maliev.ContactService.Infrastructure.csproj" />
+  <Project Path="Maliev.ContactService.Tests/Maliev.ContactService.Tests.csproj" />
+</Solution>

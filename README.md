@@ -1,74 +1,142 @@
-# Maliev.MessageService
+# Maliev Contact Service
 
-This repository contains the `Maliev.MessageService` project, migrated to a modern .NET 9 multi-project solution.
+[![Build Status](https://img.shields.io/badge/Build-Passing-success)](https://github.com/ORGANIZATION/Maliev.ContactService)
+[![.NET Version](https://img.shields.io/badge/.NET-10.0-blue)](https://dotnet.microsoft.com/download/dotnet/10.0)
+[![Database](https://img.shields.io/badge/Database-PostgreSQL%2018-blue)](https://www.postgresql.org/)
 
-## Project Structure
+Customer inquiry and business communication management service for the Maliev public gateway.
 
-The solution is composed of three main projects:
+**Role in MALIEV Architecture**: The primary entry point for external business inquiries. It captures contact form submissions, validates country data, handles file uploads for supporting documents, and provides an administrative interface for inquiry triage.
 
-*   `Maliev.MessageService.Api`: The Web API project, responsible for handling HTTP requests and responses.
-*   `Maliev.MessageService.Data`: A Class Library project for data access, containing the Entity Framework Core `DbContext` and entity models.
-*   `Maliev.MessageService.Tests`: An xUnit Test Project, containing unit tests for the API and service layers.
+---
 
-## Getting Started
+## 🏗️ Architecture & Tech Stack
+
+- **Framework**: ASP.NET Core 10.0 (C# 13)
+- **Database**: PostgreSQL 18 with Entity Framework Core 10.x
+- **Distributed Cache**: Redis 7.x (Duplicate submission prevention & admin caching)
+- **Messaging**: RabbitMQ via MassTransit
+- **API Documentation**: OpenAPI 3.1 + Scalar UI
+- **Observability**: OpenTelemetry (Metrics, Traces, Logging)
+
+---
+
+## ⚖️ Constitution Rules
+
+This service strictly adheres to the platform development mandates:
+
+### Banned Libraries
+To maintain high performance and low complexity, the following are **NOT** used:
+- ❌ **AutoMapper**: Explicit manual mapping only.
+- ❌ **FluentValidation**: Standard Data Annotations (`[Required]`, `[EmailAddress]`) only.
+- ❌ **FluentAssertions**: Standard xUnit `Assert` methods only.
+- ❌ **In-memory Test DB**: All integration tests use **Testcontainers** with real PostgreSQL 18.
+
+### Mandatory Practices
+- ✅ **TreatWarningsAsErrors**: Enabled in all `.csproj` files.
+- ✅ **XML Documentation**: Required on all public methods and properties.
+- ✅ **No Secrets in Code**: All sensitive configuration injected via environment variables.
+- ✅ **No Test Config in Program.cs**: Test configuration in test fixtures only.
+- ✅ **IAM Integration**: Self-registers permissions with the IAM Service using GCP-style naming: `{service}.{resource}.{action}`.
+
+---
+
+## ✨ Key Features
+
+- **Public Contact Gateway**: Secure submission of inquiries with country validation and anti-spam protection.
+- **Inquiry Lifecycle Management**: Full administrative workflow from 'New' to 'Resolved' status.
+- **Multimodal Support**: Seamless integration with UploadService for handling inquiry-related documents.
+- **Spam Prevention**: 60-second sliding window duplicate detection per email address.
+- **Priority Triage**: Automatic and manual prioritization of business-critical communications.
+
+---
+
+## 🚀 Quick Start
 
 ### Prerequisites
+- .NET 10.0 SDK
+- Docker Desktop (for infrastructure)
+- PostgreSQL 18 (Alpine)
 
-*   .NET 9 SDK (or later)
-*   Visual Studio 2022 (recommended) or Visual Studio Code
+### Local Development Setup
 
-### Build the Project
+1. **Clone the repository**
+```bash
+git clone https://github.com/ORGANIZATION/Maliev.ContactService.git
+cd Maliev.ContactService
+```
 
-To build the entire solution, navigate to the root directory of the repository (`R:\maliev\Maliev.MessageService`) and run the following command:
+2. **Spin up Infrastructure**
+```bash
+docker run --name contact-db -e POSTGRES_PASSWORD=YOUR_PASSWORD -p 5432:5432 -d postgres:18-alpine
+docker run --name contact-redis -p 6379:6379 -d redis:7-alpine
+```
+
+3. **Configure Environment**
+```powershell
+# Windows PowerShell
+$env:ConnectionStrings__ContactDbContext="YOUR_POSTGRES_CONNECTION_STRING"
+$env:ConnectionStrings__Cache="YOUR_REDIS_CONNECTION_STRING"
+```
+
+4. **Apply Migrations & Run**
+```bash
+dotnet ef database update --project Maliev.ContactService.Api
+dotnet run --project Maliev.ContactService.Api
+```
+
+The service will be available at `http://localhost:5000/contact`. Access the interactive documentation at `http://localhost:5000/contact/scalar`.
+
+---
+
+## 📡 API Endpoints
+
+All endpoints are prefixed with `/contact/v1`.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/contacts` | Submit a contact form |
+| GET | `/contacts` | List inquiries (Admin only) |
+| PUT | `/contacts/{id}/status` | Update inquiry status |
+| GET | `/contacts/{id}/files` | List files attached to an inquiry |
+
+---
+
+## 🏥 Health & Monitoring
+
+Standardized health probes for Kubernetes orchestration:
+- **Liveness**: `GET /contact/liveness`
+- **Readiness**: `GET /contact/readiness` (Checks DB and Redis connectivity)
+- **Metrics**: `GET /contact/metrics` (Prometheus format)
+
+---
+
+## 🧪 Testing
+
+We prioritize reliable tests over mock-heavy unit tests.
 
 ```bash
-dotnet build
+dotnet test --verbosity normal
 ```
 
-### Run Tests
+- **Integration Tests**: Use real PostgreSQL 18 containers.
+- **Contract Tests**: Ensure API stability for consumers.
 
-To run all unit tests, navigate to the root directory of the repository (`R:\maliev\Maliev.MessageService`) and run the following command:
+---
 
-```bash
-dotnet test
-```
+## ✅ Validation and release boundary
 
-### Run the API
+Pull requests, `main`, `develop`, and `release/v*` tags run the same read-only
+.NET validation workflow. Validation checks out immutable public revisions of
+the MALIEV shared sources and restores only from NuGet.org, so it does not need
+repository secrets or package credentials.
 
-To run the API locally, navigate to the `Maliev.MessageService.Api` project directory (`R:\maliev\Maliev.MessageService\Maliev.MessageService.Api`) and run the following command:
+No workflow in this repository publishes images, authenticates to Google
+Cloud, changes GitOps, or deploys to GKE. Release remains pending Aspire owner
+review and must be introduced later as a separate, explicitly approved flow.
 
-```bash
-dotnet run
-```
+---
 
-Alternatively, you can open the `Maliev.MessageService.sln` solution file in Visual Studio and run the `Maliev.MessageService.Api` project.
+## 📄 License
 
-Once the API is running, the Swagger UI will be accessible at `http://localhost:<port>/messageservice/swagger` (the port number will be displayed in the console output when you run `dotnet run`).
-
-## Configuration
-
-### Local Development Secrets
-
-For local development, sensitive information like connection strings and JWT keys are managed using User Secrets. To configure them:
-
-1.  Right-click the `Maliev.MessageService.Api` project in Visual Studio.
-2.  Select "Manage User Secrets".
-3.  Paste the following content into the `secrets.json` file that opens, replacing the placeholder values with your actual secrets:
-
-```json
-{
-  "JwtSecurityKey": "YOUR_JWT_SECURITY_KEY",
-  "Jwt:Issuer": "maliev.com",
-  "Jwt:Audience": "maliev.com",
-  "ConnectionStrings:MessageServiceDbContext": "YOUR_LOCAL_DB_CONNECTION_STRING"
-}
-```
-
-### Production Secrets
-
-For production environments, secrets are managed via Google Secret Manager. Ensure the `ConnectionStrings-MessageServiceDbContext` secret is created and populated in your Google Cloud project (`maliev-website`).
-
-```bash
-gcloud secrets create "ConnectionStrings-MessageServiceDbContext" --project="maliev-website" --replication-policy="automatic" --labels="app=messageservice,env=production"
-echo "your-production-db-connection-string" | gcloud secrets versions add "ConnectionStrings-MessageServiceDbContext" --project="maliev-website" --data-file=-
-```
+Proprietary - © 2025 MALIEV Co., Ltd. All rights reserved.

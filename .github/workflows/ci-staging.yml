@@ -1,0 +1,13 @@
+name: CI - Release Tag
+
+on:
+  push:
+    tags:
+      - "release/v*"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    uses: ./.github/workflows/_validate.yml
